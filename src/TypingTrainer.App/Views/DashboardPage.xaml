@@ -19,6 +19,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <StackPanel Spacing="3">
@@ -32,6 +33,26 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+                <TextBlock
+                    Text="Mode"
+                    HorizontalAlignment="Right"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <ComboBox
+                    x:Name="ModeFilterComboBox"
+                    Width="180"
+                    SelectedIndex="0"
+                    SelectionChanged="ModeFilterComboBox_SelectionChanged">
+                    <ComboBoxItem Content="All modes" />
+                    <ComboBoxItem Content="Adaptive" />
+                    <ComboBoxItem Content="Paragraph" />
+                    <ComboBoxItem Content="Weak Keys" />
+                    <ComboBoxItem Content="Weak Bigrams" />
+                    <ComboBoxItem Content="Review" />
+                    <ComboBoxItem Content="Fixed" />
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Column="2" Spacing="8" VerticalAlignment="Center">
                 <TextBlock
                     Text="Range"
                     HorizontalAlignment="Right"
@@ -172,6 +193,20 @@
 
                         <StackPanel Spacing="8">
                             <TextBlock Text="Path to your goal" FontWeight="SemiBold" />
+                            <Border
+                                Padding="12"
+                                BorderThickness="1"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                CornerRadius="6"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="Today&apos;s recommendation" FontWeight="SemiBold" />
+                                    <TextBlock
+                                        Text="{Binding TodayRecommendationText}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
                             <ItemsControl ItemsSource="{Binding GoalActionSteps}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -186,6 +221,46 @@
                         </StackPanel>
                     </StackPanel>
                 </Border>
+
+                <ItemsControl
+                    ItemsSource="{Binding InsightRows}"
+                    Visibility="{Binding GoalPanelVisibility}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <ItemsStackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border
+                                Width="260"
+                                MinHeight="118"
+                                Margin="0,0,12,0"
+                                Padding="14"
+                                BorderThickness="1"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                CornerRadius="8"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="5">
+                                    <TextBlock
+                                        Text="{Binding Title}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        Text="{Binding Value}"
+                                        FontSize="22"
+                                        FontWeight="SemiBold"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        Text="{Binding Detail}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        TextWrapping="Wrap"
+                                        MaxLines="2" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
                 <StackPanel Spacing="24" Visibility="{Binding DashboardContentVisibility}">
                     <Grid ColumnSpacing="12" RowSpacing="12">

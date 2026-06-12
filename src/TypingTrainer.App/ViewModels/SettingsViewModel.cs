@@ -149,6 +149,24 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public string VisualKeyboardScaleText => $"{VisualKeyboardScalePercent}%";
 
+    public bool NormalizeImportedTextToAscii
+    {
+        get => _settings.NormalizeImportedTextToAscii;
+        set => UpdateSettings(_settings with { NormalizeImportedTextToAscii = value });
+    }
+
+    public bool LowercaseImportedText
+    {
+        get => _settings.LowercaseImportedText;
+        set => UpdateSettings(_settings with { LowercaseImportedText = value });
+    }
+
+    public bool NormalizeImportedWhitespace
+    {
+        get => _settings.NormalizeImportedWhitespace;
+        set => UpdateSettings(_settings with { NormalizeImportedWhitespace = value });
+    }
+
     public string ImportFilePath
     {
         get => _importFilePath;
@@ -323,8 +341,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
                     string.IsNullOrWhiteSpace(ImportPackName) ? Path.GetFileNameWithoutExtension(ImportFilePath) : ImportPackName,
                     MinParagraphCharacters: 80,
                     MaxParagraphCharacters: 900,
-                    NormalizeWhitespace: true,
-                    LowercaseWhenImported: false),
+                    NormalizeWhitespace: _settings.NormalizeImportedWhitespace,
+                    LowercaseWhenImported: _settings.LowercaseImportedText,
+                    NormalizeToAscii: _settings.NormalizeImportedTextToAscii),
                 progress,
                 _importCancellation.Token);
 
@@ -409,6 +428,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(VisualKeyboardScalePercent));
         OnPropertyChanged(nameof(PracticeTextScaleText));
         OnPropertyChanged(nameof(VisualKeyboardScaleText));
+        OnPropertyChanged(nameof(NormalizeImportedTextToAscii));
+        OnPropertyChanged(nameof(LowercaseImportedText));
+        OnPropertyChanged(nameof(NormalizeImportedWhitespace));
     }
 
     private void QueueSettingsAutosave()

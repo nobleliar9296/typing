@@ -103,7 +103,8 @@ public sealed class TextFileImportService : ITextFileImportService
                 options.MinParagraphCharacters,
                 options.MaxParagraphCharacters,
                 options.NormalizeWhitespace,
-                options.LowercaseWhenImported))
+                options.LowercaseWhenImported,
+                options.NormalizeToAscii))
             {
                 importedCount++;
                 batch.Add(ContentAnalyzer.AnalyzeParagraph(

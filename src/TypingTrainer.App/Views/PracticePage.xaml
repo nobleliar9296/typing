@@ -28,6 +28,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Grid
@@ -202,6 +203,12 @@
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <ProgressBar
+                Grid.Row="3"
+                Maximum="100"
+                Value="{Binding ProgressPercent}"
+                Height="3" />
         </Grid>
 
         <StackPanel
@@ -244,10 +251,38 @@
                             Text="{Binding TypingFeedback}"
                             Visibility="{Binding TypingFeedbackVisibility}"
                             Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
-                        <TextBlock
-                            Text="{Binding PauseStatus}"
-                            Visibility="{Binding PauseOverlayVisibility}"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <Border
+                            Padding="14"
+                            BorderThickness="1"
+                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                            CornerRadius="6"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            Visibility="{Binding PauseOverlayVisibility}">
+                            <Grid ColumnSpacing="18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding PauseTitle}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding PauseStatus}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" MinWidth="72">
+                                    <TextBlock Text="{Binding NetWpmText}" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBlock Text="Net WPM" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" MinWidth="72">
+                                    <TextBlock Text="{Binding AccuracyText}" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBlock Text="Accuracy" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" MinWidth="64">
+                                    <TextBlock Text="{Binding ElapsedText}" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBlock Text="Time" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                         <TextBlock
                             Text="{Binding CompletionStatus}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -276,7 +311,65 @@
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button Content="Restart" Click="RestartButton_Click" />
                                 <Button Content="Next Lesson" Click="NextLessonButton_Click" />
+                                <Button
+                                    Content="Practice These Mistakes"
+                                    Click="PracticeMistakesButton_Click"
+                                    Visibility="{Binding PracticeMistakesVisibility}" />
                                 <Button Content="View Dashboard" Click="ViewDashboardButton_Click" />
+                            </StackPanel>
+                            <StackPanel Spacing="10" Visibility="{Binding ReviewVisibility}">
+                                <TextBlock Text="Review" FontSize="18" FontWeight="SemiBold" />
+                                <ItemsControl ItemsSource="{Binding ReviewNotes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock
+                                                Text="{Binding}"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                TextWrapping="Wrap"
+                                                Margin="0,1,0,0" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <ListView ItemsSource="{Binding ReviewRows}" SelectionMode="None" MaxHeight="240">
+                                    <ListView.Header>
+                                        <Grid ColumnSpacing="10" Padding="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="120" />
+                                                <ColumnDefinition Width="110" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="92" />
+                                                <ColumnDefinition Width="72" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Type" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="1" Text="Target" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="2" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="3" Text="Median ms" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="4" Text="Samples" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="5" Text="Weakness" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </Grid>
+                                    </ListView.Header>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnSpacing="10" Padding="0,7">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="120" />
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="80" />
+                                                    <ColumnDefinition Width="92" />
+                                                    <ColumnDefinition Width="72" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Kind}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Label}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Accuracy}" />
+                                                <TextBlock Grid.Column="3" Text="{Binding MedianLatencyMs}" />
+                                                <TextBlock Grid.Column="4" Text="{Binding Samples}" />
+                                                <ProgressBar Grid.Column="5" Maximum="100" Value="{Binding WeaknessPercent}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>

@@ -5,4 +5,5 @@ public sealed record TextImportOptions(
     int MinParagraphCharacters = 80,
     int MaxParagraphCharacters = 900,
     bool NormalizeWhitespace = true,
-    bool LowercaseWhenImported = false);
+    bool LowercaseWhenImported = false,
+    bool NormalizeToAscii = true);

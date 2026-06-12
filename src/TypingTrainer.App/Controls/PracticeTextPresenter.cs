@@ -53,6 +53,42 @@ public sealed class PracticeTextPresenter : UserControl
         set => SetValue(DisplayScaleProperty, value);
     }
 
+    public double GetEstimatedCursorOffsetY()
+    {
+        if (State is null || State.TargetText.Length == 0)
+        {
+            return 0;
+        }
+
+        var scale = Math.Clamp(DisplayScale, 0.5, 1.3);
+        var fontSize = 34 * scale;
+        var lineHeight = 48 * scale;
+        var availableWidth = Math.Max(ActualWidth, 1);
+        var estimatedCharactersPerLine = Math.Max(12, (int)Math.Floor(availableWidth / (fontSize * 0.58)));
+        var cursor = Math.Clamp(State.CursorIndex, 0, State.TargetText.Length);
+        var line = 0;
+        var column = 0;
+
+        for (var index = 0; index < cursor; index++)
+        {
+            if (State.TargetText[index] == '\n')
+            {
+                line++;
+                column = 0;
+                continue;
+            }
+
+            column++;
+            if (column >= estimatedCharactersPerLine)
+            {
+                line++;
+                column = 0;
+            }
+        }
+
+        return Math.Max(0, line * lineHeight);
+    }
+
     private static void OnStateChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
     {
         if (dependencyObject is PracticeTextPresenter presenter)

@@ -19,7 +19,10 @@ public sealed record AppSettings(
     int VisualKeyboardScalePercent,
     int GoalTargetNetWpm,
     int GoalTargetAccuracyPercent,
-    int GoalWeeklyPracticeMinutes)
+    int GoalWeeklyPracticeMinutes,
+    bool NormalizeImportedTextToAscii,
+    bool LowercaseImportedText,
+    bool NormalizeImportedWhitespace)
 {
     public const string AutoLessonMode = "Auto";
     public const string QwertyKeyboardLayout = "QWERTY";
@@ -43,5 +46,8 @@ public sealed record AppSettings(
         VisualKeyboardScalePercent: 100,
         GoalTargetNetWpm: 60,
         GoalTargetAccuracyPercent: 95,
-        GoalWeeklyPracticeMinutes: 75);
+        GoalWeeklyPracticeMinutes: 75,
+        NormalizeImportedTextToAscii: true,
+        LowercaseImportedText: false,
+        NormalizeImportedWhitespace: true);
 }

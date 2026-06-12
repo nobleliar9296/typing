@@ -29,9 +29,17 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
         AnalyticsRange range,
         CancellationToken cancellationToken = default)
     {
+        return await GetDashboardSnapshotAsync(range, modeFilter: null, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<DashboardSnapshot> GetDashboardSnapshotAsync(
+        AnalyticsRange range,
+        string? modeFilter,
+        CancellationToken cancellationToken = default)
+    {
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         var sessions = await LoadSessionsAsync(connection, cancellationToken).ConfigureAwait(false);
-        var filteredSessions = FilterSessions(sessions, range).ToArray();
+        var filteredSessions = FilterSessions(sessions, range, modeFilter).ToArray();
         var sessionIds = filteredSessions.Select(session => session.Id).ToHashSet();
         var characterEvents = sessionIds.Count == 0
             ? Array.Empty<AnalyticsKeyEventRow>()
@@ -70,17 +78,24 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
 
     private IEnumerable<SessionRow> FilterSessions(
         IReadOnlyList<SessionRow> sessions,
-        AnalyticsRange range)
+        AnalyticsRange range,
+        string? modeFilter)
     {
+        var filtered = string.IsNullOrWhiteSpace(modeFilter)
+            ? sessions
+            : sessions
+                .Where(session => string.Equals(session.Mode, modeFilter, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
         if (range == AnalyticsRange.AllTime)
         {
-            return sessions;
+            return filtered;
         }
 
         var days = range == AnalyticsRange.Last7Days ? 7 : 30;
         var todayLocal = ToLocalDate(_clock.UtcNow, _localTimeZone);
         var startLocal = todayLocal.AddDays(-(days - 1));
-        return sessions.Where(session =>
+        return filtered.Where(session =>
         {
             var sessionDate = ToLocalDate(session.StartedAtUtc, _localTimeZone);
             return sessionDate >= startLocal && sessionDate <= todayLocal;

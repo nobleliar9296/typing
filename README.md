@@ -2,7 +2,7 @@
 
 A native Windows typing practice app focused on fast input response, local-first analytics, adaptive practice, and local content.
 
-The current app implements the MVP typing loop, local SQLite persistence, a read-only analytics dashboard, adaptive lessons, built-in paragraph practice, local settings, streamed `.txt` import, native analytics graphs, and a visual keyboard tutor.
+The current app implements the MVP typing loop, local SQLite persistence, a read-only analytics dashboard, adaptive lessons, built-in paragraph practice, local settings, streamed `.txt` import, native analytics graphs, a visual keyboard tutor, post-session review, and local coaching insights.
 
 ## Goals
 
@@ -85,6 +85,8 @@ TypingTrainer can import large `.txt` files and split them into local practice p
 
 The importer streams the file and does not load the whole file into memory. Paragraphs are split on blank lines, oversized paragraphs are chunked, and imported rows are stored in SQLite batches.
 
+Import cleanup settings can normalize text to ASCII, normalize whitespace, and optionally lowercase imported text. ASCII normalization is enabled by default to fix curly quotes, accents, unusual dashes, and similar characters before they become practice text.
+
 Only import text you wrote, own, or have permission to use.
 
 ## Settings
@@ -100,6 +102,7 @@ Settings are stored locally in SQLite and include:
 - visual keyboard display, finger colors, and finger labels
 - capitalization, number, and punctuation preferences
 - imported and built-in content preferences
+- import cleanup preferences for ASCII, whitespace, and lowercasing
 
 ## Strict Accuracy Mode
 
@@ -146,6 +149,9 @@ Saved sessions can be exported to JSON from the Settings page.
 The dashboard reads local SQLite practice history and shows:
 
 - recent sessions
+- local insight cards
+- mode filtering
+- typing goal recommendations
 - net WPM graph
 - accuracy graph
 - practice time graph
@@ -158,6 +164,8 @@ The dashboard reads local SQLite practice history and shows:
 - slow bigrams
 
 Analytics are calculated locally. No telemetry, cloud sync, or network access is used.
+
+The dashboard can filter analytics by lesson mode and shows a concise local recommendation based on current goals, weak keys, slow bigrams, and weekly practice time.
 
 ## Data Model Note
 
@@ -195,7 +203,7 @@ Built-in paragraphs are local, original practice text. Imported paragraphs stay 
 - Paragraph: prefers enabled imported paragraphs, then falls back to built-in paragraph text.
 - Weak Keys: emphasizes the user's weakest unlocked characters.
 - Weak Bigrams: emphasizes slow or inaccurate two-character transitions.
-- Review: balanced practice from unlocked characters.
+- Review: balanced practice from unlocked characters, plus a post-session "Practice These Mistakes" flow after completed lessons.
 - Fixed: the original fixed sample sentence.
 
 ## Long Practice
@@ -223,6 +231,7 @@ Long paragraph lessons are assembled from multiple imported or built-in paragrap
 - Pressing `Esc` twice within one second ends the active incomplete session without saving it.
 - After a completed or stopped session, typing a printable key restarts the current lesson and processes that key.
 - Next Lesson regenerates the selected lesson mode.
+- Completed sessions show a review table and a Practice These Mistakes option.
 - Settings opens and persists local preferences.
 - The visual keyboard appears below the practice text and highlights the current expected key.
 - Importing a `.txt` file shows progress and creates a local content pack.

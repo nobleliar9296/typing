@@ -46,7 +46,10 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             GetClampedInt(values, "visualKeyboard.scalePercent", defaults.VisualKeyboardScalePercent, 70, 130),
             GetClampedInt(values, "goals.targetNetWpm", defaults.GoalTargetNetWpm, 10, 250),
             GetClampedInt(values, "goals.targetAccuracyPercent", defaults.GoalTargetAccuracyPercent, 50, 100),
-            GetClampedInt(values, "goals.weeklyPracticeMinutes", defaults.GoalWeeklyPracticeMinutes, 0, 10_080));
+            GetClampedInt(values, "goals.weeklyPracticeMinutes", defaults.GoalWeeklyPracticeMinutes, 0, 10_080),
+            GetBool(values, "content.normalizeImportedTextToAscii", defaults.NormalizeImportedTextToAscii),
+            GetBool(values, "content.lowercaseImportedText", defaults.LowercaseImportedText),
+            GetBool(values, "content.normalizeWhitespace", defaults.NormalizeImportedWhitespace));
     }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -73,6 +76,9 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetNetWpm", settings.GoalTargetNetWpm.ToString(), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetAccuracyPercent", settings.GoalTargetAccuracyPercent.ToString(), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.weeklyPracticeMinutes", settings.GoalWeeklyPracticeMinutes.ToString(), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "content.normalizeImportedTextToAscii", Bool(settings.NormalizeImportedTextToAscii), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "content.lowercaseImportedText", Bool(settings.LowercaseImportedText), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "content.normalizeWhitespace", Bool(settings.NormalizeImportedWhitespace), cancellationToken).ConfigureAwait(false);
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }

@@ -81,16 +81,17 @@ public sealed partial class AppTopBar : UserControl
 
     private void UpdateActivePage()
     {
-        UpdateButton(PracticeButton, "Practice");
-        UpdateButton(DashboardButton, "Dashboard");
-        UpdateButton(SettingsButton, "Settings");
+        UpdateButton(PracticeButton, PracticeUnderline, "Practice");
+        UpdateButton(DashboardButton, DashboardUnderline, "Dashboard");
+        UpdateButton(SettingsButton, SettingsUnderline, "Settings");
     }
 
-    private void UpdateButton(Button button, string pageName)
+    private void UpdateButton(Button button, FrameworkElement underline, string pageName)
     {
         var isActive = string.Equals(ActivePage, pageName, StringComparison.OrdinalIgnoreCase);
         button.IsHitTestVisible = !isActive;
-        button.Opacity = isActive ? 1.0 : 0.82;
+        button.Opacity = isActive ? 1.0 : 0.78;
         button.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
+        underline.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;
     }
 }

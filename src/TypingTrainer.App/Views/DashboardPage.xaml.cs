@@ -47,4 +47,20 @@ public sealed partial class DashboardPage : Page
 
         await ViewModel.LoadAsync();
     }
+
+    private async void ModeFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded)
+        {
+            return;
+        }
+
+        if (ModeFilterComboBox.SelectedItem is ComboBoxItem item
+            && item.Content is string content)
+        {
+            ViewModel.SelectedModeFilter = content;
+        }
+
+        await ViewModel.LoadAsync();
+    }
 }

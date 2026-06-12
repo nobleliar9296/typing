@@ -9,7 +9,8 @@ public static class ParagraphChunker
         int minParagraphCharacters,
         int maxParagraphCharacters,
         bool normalizeWhitespace,
-        bool lowercaseWhenImported)
+        bool lowercaseWhenImported,
+        bool normalizeToAscii = true)
     {
         var builder = new StringBuilder();
 
@@ -17,7 +18,7 @@ public static class ParagraphChunker
         {
             if (string.IsNullOrWhiteSpace(line))
             {
-                foreach (var paragraph in Flush(builder, minParagraphCharacters, maxParagraphCharacters, normalizeWhitespace, lowercaseWhenImported))
+                foreach (var paragraph in Flush(builder, minParagraphCharacters, maxParagraphCharacters, normalizeWhitespace, lowercaseWhenImported, normalizeToAscii))
                 {
                     yield return paragraph;
                 }
@@ -33,7 +34,7 @@ public static class ParagraphChunker
             builder.Append(line.Trim());
         }
 
-        foreach (var paragraph in Flush(builder, minParagraphCharacters, maxParagraphCharacters, normalizeWhitespace, lowercaseWhenImported))
+        foreach (var paragraph in Flush(builder, minParagraphCharacters, maxParagraphCharacters, normalizeWhitespace, lowercaseWhenImported, normalizeToAscii))
         {
             yield return paragraph;
         }
@@ -71,7 +72,8 @@ public static class ParagraphChunker
         int minParagraphCharacters,
         int maxParagraphCharacters,
         bool normalizeWhitespace,
-        bool lowercaseWhenImported)
+        bool lowercaseWhenImported,
+        bool normalizeToAscii)
     {
         if (builder.Length == 0)
         {
@@ -85,7 +87,10 @@ public static class ParagraphChunker
             ? NormalizeWhitespace(paragraph)
             : paragraph.Trim();
 
-        paragraph = AsciiTextNormalizer.ToAscii(paragraph);
+        if (normalizeToAscii)
+        {
+            paragraph = AsciiTextNormalizer.ToAscii(paragraph);
+        }
 
         if (normalizeWhitespace)
         {

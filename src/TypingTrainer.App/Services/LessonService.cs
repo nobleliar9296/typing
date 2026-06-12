@@ -1,5 +1,6 @@
 using TypingTrainer.Core.Keyboard;
 using TypingTrainer.Core.Lessons;
+using TypingTrainer.Core.Review;
 using TypingTrainer.Core.Skill;
 using TypingTrainer.Data.Content;
 using TypingTrainer.Data.Models;
@@ -100,6 +101,50 @@ public sealed class LessonService : ILessonService
         }
     }
 
+    public async Task<LessonGenerationResult> GenerateReviewLessonAsync(
+        SessionReview review,
+        int targetCharacters,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var settings = await _appSettingsRepository.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
+            var profile = new SessionReviewGenerator().CreatePracticeProfile(review);
+            var mode = review.FocusBigrams.Count > 0 ? LessonMode.WeakBigrams : LessonMode.WeakKeys;
+            var seed = CreateStableSeed(
+                review.CorrectedErrors,
+                review.UncorrectedErrors,
+                string.Join(string.Empty, review.FocusCharacters),
+                string.Join('|', review.FocusBigrams));
+            var lesson = _adaptiveLessonGenerator.Generate(
+                profile,
+                new LessonGenerationOptions(
+                    mode,
+                    LessonLengthKind.Characters,
+                    Math.Clamp(targetCharacters, 80, 800),
+                    KeyboardLayoutRepository.Qwerty,
+                    seed,
+                    settings.AllowCapitalLetters,
+                    settings.AllowNumbers,
+                    settings.AllowPunctuation));
+
+            return lesson with
+            {
+                Reason = review.FocusBigrams.Count > 0
+                    ? $"Review practice focused on {string.Join(", ", review.FocusBigrams)}"
+                    : $"Review practice focused on {string.Join(", ", review.FocusCharacters)}",
+                ContentTitle = "Practice These Mistakes",
+                ContentSource = "Last session review"
+            };
+        }
+        catch
+        {
+            return new FixedLessonGenerator().Generate(
+                SkillProfileDefaults.Empty(),
+                CreateOptions(LessonMode.Fixed, AppSettings.Defaults, FixedLessonGenerator.FixedLessonText.Length));
+        }
+    }
+
     private static LessonGenerationOptions CreateOptions(LessonMode mode, AppSettings settings, int targetCharacters)
     {
         return new LessonGenerationOptions(
@@ -161,5 +206,23 @@ public sealed class LessonService : ILessonService
         return Enum.TryParse<LessonMode>(value, ignoreCase: true, out var mode)
             ? mode
             : fallback;
+    }
+
+    private static int CreateStableSeed(params object[] values)
+    {
+        unchecked
+        {
+            var hash = 17;
+            foreach (var value in values)
+            {
+                var text = value?.ToString() ?? string.Empty;
+                foreach (var character in text)
+                {
+                    hash = (hash * 31) + character;
+                }
+            }
+
+            return hash;
+        }
     }
 }

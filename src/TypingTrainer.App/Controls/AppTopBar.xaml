@@ -4,8 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     MinHeight="42">
     <Border
-        Padding="18,6"
-        Background="#1B1B1B"
+        Padding="18,5"
+        Background="#191919"
         BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
         BorderThickness="0,0,0,1">
         <Grid ColumnSpacing="18">
@@ -24,24 +24,65 @@
             <StackPanel
                 Grid.Column="1"
                 Orientation="Horizontal"
-                Spacing="2"
+                Spacing="4"
                 VerticalAlignment="Center">
-                <Button
-                    x:Name="PracticeButton"
-                    Content="Practice"
-                    Click="PracticeButton_Click"
-                    Padding="14,5" />
-                <Button
-                    x:Name="DashboardButton"
-                    Content="Dashboard"
-                    Click="DashboardButton_Click"
-                    Padding="14,5" />
-                <Button
-                    x:Name="SettingsButton"
-                    Content="Settings"
-                    Click="SettingsButton_Click"
-                    Padding="14,5" />
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="2" />
+                    </Grid.RowDefinitions>
+                    <Button
+                        x:Name="PracticeButton"
+                        Content="Practice"
+                        Click="PracticeButton_Click"
+                        Padding="14,4" />
+                    <Border
+                        x:Name="PracticeUnderline"
+                        Grid.Row="1"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        CornerRadius="1" />
+                </Grid>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="2" />
+                    </Grid.RowDefinitions>
+                    <Button
+                        x:Name="DashboardButton"
+                        Content="Dashboard"
+                        Click="DashboardButton_Click"
+                        Padding="14,4" />
+                    <Border
+                        x:Name="DashboardUnderline"
+                        Grid.Row="1"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        CornerRadius="1" />
+                </Grid>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="2" />
+                    </Grid.RowDefinitions>
+                    <Button
+                        x:Name="SettingsButton"
+                        Content="Settings"
+                        Click="SettingsButton_Click"
+                        Padding="14,4" />
+                    <Border
+                        x:Name="SettingsUnderline"
+                        Grid.Row="1"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        CornerRadius="1" />
+                </Grid>
             </StackPanel>
+
+            <TextBlock
+                Grid.Column="2"
+                Text="Local only"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </Grid>
     </Border>
 </UserControl>

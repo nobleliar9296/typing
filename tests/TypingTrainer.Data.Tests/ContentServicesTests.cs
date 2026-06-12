@@ -215,6 +215,9 @@ public sealed class ContentServicesTests
         Assert.AreEqual(60, settings.GoalTargetNetWpm);
         Assert.AreEqual(95, settings.GoalTargetAccuracyPercent);
         Assert.AreEqual(75, settings.GoalWeeklyPracticeMinutes);
+        Assert.IsTrue(settings.NormalizeImportedTextToAscii);
+        Assert.IsFalse(settings.LowercaseImportedText);
+        Assert.IsTrue(settings.NormalizeImportedWhitespace);
     }
 
     [TestMethod]
@@ -372,6 +375,36 @@ public sealed class ContentServicesTests
         Assert.AreEqual(72, settings.GoalTargetNetWpm);
         Assert.AreEqual(97, settings.GoalTargetAccuracyPercent);
         Assert.AreEqual(120, settings.GoalWeeklyPracticeMinutes);
+    }
+
+    [TestMethod]
+    public async Task AppSettingsRepository_DefaultImportCleanupSettings_AreReturnedWhenEmpty()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+
+        var settings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.IsTrue(settings.NormalizeImportedTextToAscii);
+        Assert.IsFalse(settings.LowercaseImportedText);
+        Assert.IsTrue(settings.NormalizeImportedWhitespace);
+    }
+
+    [TestMethod]
+    public async Task AppSettingsRepository_SaveImportCleanupSettings_Persists()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+
+        await database.SettingsRepository.SaveSettingsAsync(AppSettings.Defaults with
+        {
+            NormalizeImportedTextToAscii = false,
+            LowercaseImportedText = true,
+            NormalizeImportedWhitespace = false
+        });
+        var settings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.IsFalse(settings.NormalizeImportedTextToAscii);
+        Assert.IsTrue(settings.LowercaseImportedText);
+        Assert.IsFalse(settings.NormalizeImportedWhitespace);
     }
 
     [TestMethod]

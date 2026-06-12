@@ -48,6 +48,35 @@ public sealed class AnalyticsQueryServiceTests
     }
 
     [TestMethod]
+    public async Task AnalyticsQueryService_GetDashboardSnapshot_ModeFilterLimitsSummarySessions()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-2), mode: "Fixed", netWpm: 35));
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-1), mode: "Paragraph", netWpm: 65));
+
+        var snapshot = await database.Analytics.GetDashboardSnapshotAsync(AnalyticsRange.Last7Days, "Paragraph");
+
+        Assert.AreEqual(1, snapshot.Summary.SessionCount);
+        Assert.AreEqual(65, snapshot.Summary.AverageNetWpm, 0.0001);
+    }
+
+    [TestMethod]
+    public async Task AnalyticsQueryService_GetDashboardSnapshot_ModeFilterLimitsKeyEvents()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        var fixedSession = CreateSession(startedAtUtc: NowUtc.AddHours(-2), mode: "Fixed", targetText: "e");
+        var paragraphSession = CreateSession(startedAtUtc: NowUtc.AddHours(-1), mode: "Paragraph", targetText: "a");
+
+        await database.SaveAsync(fixedSession, [CharacterEvent(fixedSession.Id, 0, 'e', 'x', false, 100, 1)]);
+        await database.SaveAsync(paragraphSession, [CharacterEvent(paragraphSession.Id, 0, 'a', 'x', false, 100, 1)]);
+
+        var snapshot = await database.Analytics.GetDashboardSnapshotAsync(AnalyticsRange.AllTime, "Paragraph");
+
+        Assert.AreEqual(1, snapshot.WeakestCharacters.Count);
+        Assert.AreEqual("a", snapshot.WeakestCharacters.Single().Character);
+    }
+
+    [TestMethod]
     public async Task AnalyticsQueryService_GetDashboardSnapshot_GroupsDailyMetricsByDate()
     {
         await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
@@ -224,6 +253,7 @@ public sealed class AnalyticsQueryServiceTests
     private static StoredPracticeSession CreateSession(
         DateTimeOffset startedAtUtc,
         string targetText = "ab",
+        string mode = "fixed",
         double rawWpm = 50,
         double netWpm = 45,
         int total = 2,
@@ -233,7 +263,7 @@ public sealed class AnalyticsQueryServiceTests
             Guid.NewGuid(),
             startedAtUtc,
             startedAtUtc.AddMinutes(1),
-            "fixed",
+            mode,
             targetText,
             targetText.Length,
             rawWpm,

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -7,12 +8,17 @@ using Microsoft.UI.Xaml.Media;
 using TypingTrainer.App.ViewModels;
 using TypingTrainer.Core.Lessons;
 using Windows.System;
+using Windows.UI;
 
 namespace TypingTrainer.App.Views;
 
 public sealed partial class PracticePage : Page
 {
     private bool _isLoaded;
+    private bool _suppressLessonSelectionChanges;
+    private readonly DispatcherTimer _mistakeFeedbackTimer = new() { Interval = TimeSpan.FromMilliseconds(240) };
+    private readonly SolidColorBrush _mistakeBorderBrush = new(Color.FromArgb(255, 196, 43, 55));
+    private Brush? _defaultInputBorderBrush;
 
     public PracticePage()
     {
@@ -21,6 +27,8 @@ public sealed partial class PracticePage : Page
             App.Services.SessionPersistenceQueue,
             App.Services.LessonService);
         DataContext = ViewModel;
+        ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+        _mistakeFeedbackTimer.Tick += MistakeFeedbackTimer_Tick;
 
         var restartAccelerator = new KeyboardAccelerator
         {
@@ -36,6 +44,8 @@ public sealed partial class PracticePage : Page
 
     private async void PracticePage_Loaded(object sender, RoutedEventArgs e)
     {
+        _defaultInputBorderBrush ??= InputBorder.BorderBrush;
+
         if (!_isLoaded)
         {
             await ViewModel.InitializeAsync();
@@ -117,6 +127,16 @@ public sealed partial class PracticePage : Page
         QueueScrollToCursor();
     }
 
+    private async void PracticeMistakesButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.PracticeMistakesAsync();
+        _suppressLessonSelectionChanges = true;
+        LessonModeComboBox.SelectedIndex = 4;
+        _suppressLessonSelectionChanges = false;
+        InputSurface.Focus(FocusState.Programmatic);
+        QueueScrollToCursor();
+    }
+
     private async void ViewDashboardButton_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -133,7 +153,7 @@ public sealed partial class PracticePage : Page
 
     private async void LessonModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_isLoaded)
+        if (!_isLoaded || _suppressLessonSelectionChanges)
         {
             return;
         }
@@ -401,11 +421,40 @@ public sealed partial class PracticePage : Page
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            var textLength = Math.Max(1, ViewModel.CurrentState.TargetText.Length);
-            var ratio = Math.Clamp(ViewModel.CurrentState.CursorIndex / (double)textLength, 0, 1);
-            var offset = PracticeTextScrollViewer.ScrollableHeight * ratio;
+            var cursorOffset = PracticeTextPresenter.GetEstimatedCursorOffsetY();
+            var viewportAnchor = Math.Max(0, PracticeTextScrollViewer.ViewportHeight * 0.38);
+            var offset = Math.Clamp(
+                cursorOffset - viewportAnchor,
+                0,
+                Math.Max(0, PracticeTextScrollViewer.ScrollableHeight));
             PracticeTextScrollViewer.ChangeView(null, offset, null, disableAnimation: true);
         });
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PracticeViewModel.TypingFeedbackVisibility)
+            && ViewModel.TypingFeedbackVisibility == Visibility.Visible)
+        {
+            FlashInputBorder();
+        }
+    }
+
+    private void FlashInputBorder()
+    {
+        _defaultInputBorderBrush ??= InputBorder.BorderBrush;
+        InputBorder.BorderBrush = _mistakeBorderBrush;
+        _mistakeFeedbackTimer.Stop();
+        _mistakeFeedbackTimer.Start();
+    }
+
+    private void MistakeFeedbackTimer_Tick(object? sender, object e)
+    {
+        _mistakeFeedbackTimer.Stop();
+        if (_defaultInputBorderBrush is not null)
+        {
+            InputBorder.BorderBrush = _defaultInputBorderBrush;
+        }
     }
 
     private static bool IsInteractiveElement(DependencyObject? source)

@@ -19,6 +19,9 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     private bool _isLoading;
     private string? _errorMessage;
     private string _goalStatus = string.Empty;
+    private string _selectedModeFilter = AllModesFilter;
+
+    public const string AllModesFilter = "All modes";
 
     public DashboardViewModel(
         IAnalyticsQueryService analyticsQueryService,
@@ -38,6 +41,19 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             if (_selectedRange != value)
             {
                 _selectedRange = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public string SelectedModeFilter
+    {
+        get => _selectedModeFilter;
+        set
+        {
+            if (_selectedModeFilter != value)
+            {
+                _selectedModeFilter = value;
                 OnPropertyChanged();
             }
         }
@@ -155,6 +171,8 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     public string GoalWeeklyProgressText =>
         $"{FormatDuration(WeeklyPracticeTime)} practiced in the last 7 days";
 
+    public string TodayRecommendationText => BuildTodayRecommendation();
+
     public string GoalStatus
     {
         get => _goalStatus;
@@ -169,6 +187,8 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     }
 
     public IReadOnlyList<string> GoalActionSteps => BuildGoalActionSteps();
+
+    public IReadOnlyList<DashboardInsightRow> InsightRows => BuildInsightRows();
 
     public IReadOnlyList<DailyMetricDisplayRow> DailyMetricRows => Snapshot?.DailyMetrics
         .Select(point => new DailyMetricDisplayRow(
@@ -230,7 +250,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             ErrorMessage = null;
             _settings = await _settingsRepository.GetSettingsAsync(cancellationToken).ConfigureAwait(true);
             Snapshot = await _analyticsQueryService
-                .GetDashboardSnapshotAsync(SelectedRange, cancellationToken)
+                .GetDashboardSnapshotAsync(SelectedRange, GetModeFilterValue(), cancellationToken)
                 .ConfigureAwait(true);
             _weeklySnapshot = SelectedRange == AnalyticsRange.Last7Days
                 ? Snapshot
@@ -329,11 +349,17 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
 
         if (accuracy < accuracyTarget)
         {
-            steps.Add("Use Strict Accuracy Mode and Weak Keys until accuracy is consistently on target.");
+            var key = Snapshot?.WeakestCharacters.FirstOrDefault()?.DisplayCharacter;
+            steps.Add(string.IsNullOrWhiteSpace(key)
+                ? "Use Strict Accuracy Mode and Weak Keys until accuracy is consistently on target."
+                : $"Use Strict Accuracy Mode and Weak Keys, starting with {key}.");
         }
         else if (averageNetWpm < _settings.GoalTargetNetWpm)
         {
-            steps.Add("Use Paragraph mode for flow, then Weak Bigrams to smooth slow transitions.");
+            var bigram = Snapshot?.SlowestBigrams.FirstOrDefault()?.DisplayBigram;
+            steps.Add(string.IsNullOrWhiteSpace(bigram)
+                ? "Use Paragraph mode for flow, then Weak Bigrams to smooth slow transitions."
+                : $"Use Paragraph mode for flow, then Weak Bigrams for {bigram}.");
         }
 
         if (remainingPracticeMinutes > 0)
@@ -350,6 +376,93 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         steps.Add("After each paragraph block, review the weak keys list and run one targeted lesson.");
 
         return steps.Take(3).ToArray();
+    }
+
+    private IReadOnlyList<DashboardInsightRow> BuildInsightRows()
+    {
+        var snapshot = Snapshot;
+        if (snapshot is null || snapshot.Summary.SessionCount == 0)
+        {
+            return
+            [
+                new DashboardInsightRow("Baseline", "No data yet", "Complete 5 saved sessions to make the coaching more useful."),
+                new DashboardInsightRow("Next step", "Practice", "Start with Paragraph or Adaptive mode for a clean baseline."),
+                new DashboardInsightRow("Local status", "Private", "Insights are calculated from your local SQLite history.")
+            ];
+        }
+
+        var accuracyTarget = _settings.GoalTargetAccuracyPercent / 100.0;
+        var weakestKey = snapshot.WeakestCharacters.FirstOrDefault();
+        var slowestBigram = snapshot.SlowestBigrams.FirstOrDefault();
+        var remainingPracticeMinutes = Math.Max(0, _settings.GoalWeeklyPracticeMinutes - WeeklyPracticeTime.TotalMinutes);
+        var strength = snapshot.Summary.Accuracy >= accuracyTarget
+            ? new DashboardInsightRow("Strength", "Accuracy", $"You are at {FormatPercent(snapshot.Summary.Accuracy)} against a {GoalTargetAccuracyText} target.")
+            : new DashboardInsightRow("Strength", "Practice volume", $"{SessionCountText} saved sessions in this view.");
+        var limiter = weakestKey is not null && weakestKey.Accuracy < accuracyTarget
+            ? new DashboardInsightRow("Biggest limiter", weakestKey.DisplayCharacter, $"{FormatPercent(weakestKey.Accuracy)} accuracy across {weakestKey.ExposureCount} samples.")
+            : slowestBigram is not null
+                ? new DashboardInsightRow("Biggest limiter", slowestBigram.DisplayBigram, $"{FormatLatency(slowestBigram.MedianLatencyMs)} ms median transition.")
+                : new DashboardInsightRow("Biggest limiter", "Pace", $"{GoalWpmGapText}.");
+        var weekly = remainingPracticeMinutes > 0
+            ? new DashboardInsightRow("This week", FormatDuration(TimeSpan.FromMinutes(remainingPracticeMinutes)), "Remaining to hit your weekly practice target.")
+            : new DashboardInsightRow("This week", "On pace", "Weekly practice target reached.");
+
+        return [strength, limiter, new DashboardInsightRow("Recommended", GetRecommendedModeName(), TodayRecommendationText), weekly];
+    }
+
+    private string BuildTodayRecommendation()
+    {
+        var snapshot = Snapshot;
+        if (snapshot is null || snapshot.Summary.SessionCount == 0)
+        {
+            return "Complete 5 short sessions so the app can identify stable weak keys and speed patterns.";
+        }
+
+        var accuracyTarget = _settings.GoalTargetAccuracyPercent / 100.0;
+        var remainingPracticeMinutes = Math.Max(0, _settings.GoalWeeklyPracticeMinutes - WeeklyPracticeTime.TotalMinutes);
+        var durationText = remainingPracticeMinutes > 0
+            ? $" Aim for {FormatDuration(TimeSpan.FromMinutes(Math.Min(15, remainingPracticeMinutes)))} today."
+            : " Keep the session short and focused.";
+
+        if (snapshot.Summary.Accuracy < accuracyTarget)
+        {
+            var key = snapshot.WeakestCharacters.FirstOrDefault()?.DisplayCharacter;
+            return string.IsNullOrWhiteSpace(key)
+                ? $"Run Weak Keys with Strict Accuracy Mode enabled.{durationText}"
+                : $"Run Weak Keys with Strict Accuracy Mode, focusing first on {key}.{durationText}";
+        }
+
+        if (snapshot.Summary.AverageNetWpm < _settings.GoalTargetNetWpm)
+        {
+            var bigram = snapshot.SlowestBigrams.FirstOrDefault()?.DisplayBigram;
+            return string.IsNullOrWhiteSpace(bigram)
+                ? $"Run Paragraph mode, then finish with Weak Bigrams.{durationText}"
+                : $"Run Paragraph mode, then smooth the {bigram} transition in Weak Bigrams.{durationText}";
+        }
+
+        return $"You are on target. Use Review or Paragraph mode to maintain control.{durationText}";
+    }
+
+    private string GetRecommendedModeName()
+    {
+        var snapshot = Snapshot;
+        if (snapshot is null || snapshot.Summary.SessionCount == 0)
+        {
+            return "Paragraph";
+        }
+
+        return snapshot.Summary.Accuracy < (_settings.GoalTargetAccuracyPercent / 100.0)
+            ? "Weak Keys"
+            : snapshot.Summary.AverageNetWpm < _settings.GoalTargetNetWpm
+                ? "Paragraph"
+                : "Review";
+    }
+
+    private string? GetModeFilterValue()
+    {
+        return string.Equals(SelectedModeFilter, AllModesFilter, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : SelectedModeFilter.Replace(" ", string.Empty, StringComparison.Ordinal);
     }
 
     private void UpdateGoalSettings(AppSettings settings)
@@ -370,7 +483,9 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(GoalTargetAccuracyText));
         OnPropertyChanged(nameof(GoalWeeklyPracticeText));
         OnPropertyChanged(nameof(GoalWeeklyProgressText));
+        OnPropertyChanged(nameof(TodayRecommendationText));
         OnPropertyChanged(nameof(GoalActionSteps));
+        OnPropertyChanged(nameof(InsightRows));
     }
 
     private static int ClampToInt(double value, int minimum, int maximum)
@@ -431,6 +546,11 @@ public sealed record RecentSessionDisplayRow(
 public sealed record ChartPointViewModel(
     string Label,
     double Value);
+
+public sealed record DashboardInsightRow(
+    string Title,
+    string Value,
+    string Detail);
 
 public sealed record AnalyticsDisplayRow(
     string Label,

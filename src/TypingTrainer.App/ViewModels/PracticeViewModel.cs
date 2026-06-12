@@ -7,6 +7,7 @@ using TypingTrainer.App.Services;
 using TypingTrainer.Core.Keyboard;
 using TypingTrainer.Core.Lessons;
 using TypingTrainer.Core.Models;
+using TypingTrainer.Core.Review;
 using TypingTrainer.Core.Skill;
 using TypingTrainer.Core.Typing;
 using TypingTrainer.Data.Models;
@@ -17,6 +18,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 {
     private readonly ISessionPersistenceQueue _sessionPersistenceQueue;
     private readonly ILessonService _lessonService;
+    private readonly SessionReviewGenerator _reviewGenerator = new();
     private readonly ICharacterToKeyMapper _keyMapper = new QwertyCharacterToKeyMapper();
     private readonly VisualKeyboardLayout _visualKeyboardLayout = QwertyVisualKeyboardLayout.Create();
     private TypingSession _session;
@@ -35,6 +37,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private string _pauseStatus = string.Empty;
     private string _typingFeedback = string.Empty;
     private SessionSummary? _lastSummary;
+    private SessionReview? _lastReview;
     private AppSettings _settings = AppSettings.Defaults;
 
     public PracticeViewModel(
@@ -141,6 +144,13 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         : (Math.Min(CurrentState.CursorIndex, CurrentState.TargetText.Length) / (double)CurrentState.TargetText.Length)
             .ToString("P0", CultureInfo.InvariantCulture);
 
+    public double ProgressPercent => CurrentState.TargetText.Length == 0
+        ? 0
+        : Math.Clamp(
+            Math.Min(CurrentState.CursorIndex, CurrentState.TargetText.Length) * 100.0 / CurrentState.TargetText.Length,
+            0,
+            100);
+
     public string CharactersText => $"{Math.Min(CurrentState.CursorIndex, CurrentState.TargetText.Length)} / {CurrentState.TargetText.Length}";
 
     public bool IsComplete => CurrentState.IsComplete;
@@ -218,10 +228,13 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             {
                 _pauseStatus = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(PauseTitle));
                 OnPropertyChanged(nameof(PauseOverlayVisibility));
             }
         }
     }
+
+    public string PauseTitle => _isStopped ? "Stopped" : "Paused";
 
     public Visibility PauseOverlayVisibility => string.IsNullOrWhiteSpace(PauseStatus)
         ? Visibility.Collapsed
@@ -260,6 +273,20 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     public string CompletionAccuracyText => FormatPercent(_lastSummary?.Accuracy ?? 0);
 
     public string CompletionErrorsText => (_lastSummary?.CurrentErrors ?? 0).ToString(CultureInfo.InvariantCulture);
+
+    public IReadOnlyList<PracticeReviewRow> ReviewRows => BuildReviewRows(_lastReview);
+
+    public IReadOnlyList<string> ReviewNotes => _lastReview?.Notes ?? Array.Empty<string>();
+
+    public Visibility ReviewVisibility => _lastReview is not null
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public bool CanPracticeMistakes => _lastReview?.HasPracticeTargets == true;
+
+    public Visibility PracticeMistakesVisibility => CanPracticeMistakes
+        ? Visibility.Visible
+        : Visibility.Collapsed;
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -308,6 +335,34 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         StartSession(_currentLesson, _activeLessonMode);
     }
 
+    public async Task PracticeMistakesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_lastReview is null || !CanPracticeMistakes)
+        {
+            return;
+        }
+
+        try
+        {
+            IsGeneratingLesson = true;
+            CompletionStatus = "Generating review lesson...";
+            _settings = await _lessonService.GetSettingsAsync(cancellationToken);
+            var targetCharacters = PracticeLessonSizeTargets.GetTargetCharacters(
+                PracticeLessonSize.Small,
+                _settings.LessonLengthCharacters);
+            var lesson = await _lessonService.GenerateReviewLessonAsync(
+                _lastReview,
+                targetCharacters,
+                cancellationToken);
+            SelectedLessonMode = LessonMode.Review;
+            StartSession(lesson, LessonMode.Review);
+        }
+        finally
+        {
+            IsGeneratingLesson = false;
+        }
+    }
+
     private void StartSession(LessonGenerationResult lesson, LessonMode mode)
     {
         _sessionGeneration++;
@@ -322,6 +377,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _isStopped = false;
         _lastEscapeTimestampTicks = null;
         _lastSummary = null;
+        _lastReview = null;
         CompletionStatus = string.Empty;
         PauseStatus = string.Empty;
         TypingFeedback = string.Empty;
@@ -329,6 +385,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         CurrentState = _session.GetSnapshot(Stopwatch.GetTimestamp());
         OnLessonChanged();
         OnCompletionChanged();
+        OnReviewChanged();
     }
 
     public void HandleCharacter(char character)
@@ -431,7 +488,9 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             {
                 CurrentState = completedSession.GetSnapshot(timestampTicks);
                 _lastSummary = summary;
+                _lastReview = _reviewGenerator.Generate(summary, events);
                 OnCompletionChanged();
+                OnReviewChanged();
             }
 
             if (_settings.AutoSaveCompletedSessions)
@@ -463,6 +522,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ElapsedText));
         OnPropertyChanged(nameof(ErrorsText));
         OnPropertyChanged(nameof(ProgressText));
+        OnPropertyChanged(nameof(ProgressPercent));
         OnPropertyChanged(nameof(CharactersText));
         OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(IsInputEnabled));
@@ -490,6 +550,15 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CompletionNetWpmText));
         OnPropertyChanged(nameof(CompletionAccuracyText));
         OnPropertyChanged(nameof(CompletionErrorsText));
+    }
+
+    private void OnReviewChanged()
+    {
+        OnPropertyChanged(nameof(ReviewRows));
+        OnPropertyChanged(nameof(ReviewNotes));
+        OnPropertyChanged(nameof(ReviewVisibility));
+        OnPropertyChanged(nameof(CanPracticeMistakes));
+        OnPropertyChanged(nameof(PracticeMistakesVisibility));
     }
 
     private void OnKeyboardHighlightChanged()
@@ -546,6 +615,61 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         return Math.Max(0, netWpm);
     }
 
+    private static IReadOnlyList<PracticeReviewRow> BuildReviewRows(SessionReview? review)
+    {
+        if (review is null)
+        {
+            return Array.Empty<PracticeReviewRow>();
+        }
+
+        var rows = new List<PracticeReviewRow>();
+        rows.AddRange(review.MostMissedKeys.Select(row => ToReviewRow("Missed key", row)));
+        rows.AddRange(review.WeakestBigrams.Select(row => ToReviewRow("Weak bigram", row)));
+
+        foreach (var row in review.SlowestKeys)
+        {
+            if (rows.Any(existing => existing.Label == row.DisplayCharacter))
+            {
+                continue;
+            }
+
+            rows.Add(ToReviewRow("Slow key", row));
+        }
+
+        return rows
+            .OrderByDescending(row => row.WeaknessPercent)
+            .ThenBy(row => row.Kind, StringComparer.Ordinal)
+            .Take(8)
+            .ToArray();
+    }
+
+    private static PracticeReviewRow ToReviewRow(string kind, SessionReviewKeyRow row)
+    {
+        return new PracticeReviewRow(
+            kind,
+            row.DisplayCharacter,
+            FormatPercent(row.Accuracy),
+            FormatLatency(row.MedianLatencyMs),
+            row.Samples.ToString(CultureInfo.InvariantCulture),
+            row.WeaknessScore * 100);
+    }
+
+    private static PracticeReviewRow ToReviewRow(string kind, SessionReviewBigramRow row)
+    {
+        return new PracticeReviewRow(
+            kind,
+            row.DisplayBigram,
+            FormatPercent(row.Accuracy),
+            FormatLatency(row.MedianLatencyMs),
+            row.Samples.ToString(CultureInfo.InvariantCulture),
+            row.WeaknessScore * 100);
+    }
+
+    private static string FormatLatency(double? value)
+    {
+        return value is null ? "-" : value.Value.ToString("0", CultureInfo.InvariantCulture);
+    }
+
     private TypingSessionOptions CreateTypingSessionOptions()
     {
         return new TypingSessionOptions(
@@ -559,6 +683,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     {
         _completionQueued = false;
         _lastSummary = null;
+        _lastReview = null;
         _lastEscapeTimestampTicks = null;
         IsPaused = false;
         _isStopped = true;
@@ -566,6 +691,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         CompletionStatus = string.Empty;
         TypingFeedback = string.Empty;
         OnCompletionChanged();
+        OnReviewChanged();
         OnPropertyChanged(nameof(IsInputEnabled));
     }
 
@@ -592,3 +718,11 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }
+
+public sealed record PracticeReviewRow(
+    string Kind,
+    string Label,
+    string Accuracy,
+    string MedianLatencyMs,
+    string Samples,
+    double WeaknessPercent);

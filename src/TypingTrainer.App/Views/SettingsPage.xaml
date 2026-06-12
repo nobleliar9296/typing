@@ -188,6 +188,17 @@
                                 </StackPanel>
                             </StackPanel>
 
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Import cleanup" FontWeight="SemiBold" />
+                                <CheckBox Content="Normalize imported text to ASCII" IsChecked="{Binding NormalizeImportedTextToAscii, Mode=TwoWay}" />
+                                <CheckBox Content="Normalize whitespace" IsChecked="{Binding NormalizeImportedWhitespace, Mode=TwoWay}" />
+                                <CheckBox Content="Lowercase imported text" IsChecked="{Binding LowercaseImportedText, Mode=TwoWay}" />
+                                <TextBlock
+                                    Text="ASCII normalization fixes curly quotes, accents, dashes, and other characters that can be awkward to type."
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
                             <ListView x:Name="ContentPacksListView" ItemsSource="{Binding ContentPackRows}" SelectionMode="Single" SelectionChanged="ContentPacksListView_SelectionChanged" MaxHeight="260">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
