@@ -55,7 +55,14 @@ public sealed class KeyboardHeatmapControl : UserControl
     private void Render()
     {
         var heatmap = (Rows ?? Array.Empty<KeyboardHeatmapDisplayRow>())
-            .ToDictionary(row => row.Key, StringComparer.OrdinalIgnoreCase);
+            .GroupBy(row => NormalizeHeatmapLabel(row.Key), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(row => row.WeaknessPercent)
+                    .ThenByDescending(row => ParseSampleCount(row.Samples))
+                    .First(),
+                StringComparer.OrdinalIgnoreCase);
         var panel = new StackPanel { Spacing = 2 };
 
         foreach (var row in _layout.Rows)
@@ -122,5 +129,17 @@ public sealed class KeyboardHeatmapControl : UserControl
         return key.PrimaryLabel.Length == 1
             ? key.PrimaryLabel.ToLowerInvariant()
             : key.PrimaryLabel;
+    }
+
+    private static string NormalizeHeatmapLabel(string label)
+    {
+        return label.Length == 1
+            ? label.ToLowerInvariant()
+            : label;
+    }
+
+    private static int ParseSampleCount(string samples)
+    {
+        return int.TryParse(samples, out var value) ? value : 0;
     }
 }

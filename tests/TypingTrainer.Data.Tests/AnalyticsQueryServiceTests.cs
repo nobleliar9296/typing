@@ -161,6 +161,27 @@ public sealed class AnalyticsQueryServiceTests
     }
 
     [TestMethod]
+    public async Task KeyboardHeatmapQueryService_MergesUppercaseAndLowercaseIntoPhysicalKey()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        var session = CreateSession(startedAtUtc: NowUtc.AddHours(-1), targetText: "kK");
+        await database.SaveAsync(session,
+        [
+            CharacterEvent(session.Id, 0, 'k', 'k', true, 100, 1),
+            CharacterEvent(session.Id, 1, 'K', 'K', true, 120, 2)
+        ]);
+
+        var rows = await database.Heatmap.GetHeatmapAsync(AnalyticsRange.AllTime);
+        var kRows = rows
+            .Where(row => string.Equals(row.KeyLabel, "K", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Assert.AreEqual(1, kRows.Length);
+        Assert.AreEqual(2, kRows[0].ExposureCount);
+        Assert.AreEqual(1, kRows[0].Accuracy);
+    }
+
+    [TestMethod]
     public async Task SessionDetailQueryService_ReturnsTimelineMistakesAndSlowTransitions()
     {
         await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);

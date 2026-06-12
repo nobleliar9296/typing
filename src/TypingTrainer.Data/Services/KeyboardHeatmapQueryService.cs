@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using TypingTrainer.Core.Keyboard;
 using TypingTrainer.Data.Database;
 using TypingTrainer.Data.Models;
 
@@ -6,6 +7,17 @@ namespace TypingTrainer.Data.Services;
 
 public sealed class KeyboardHeatmapQueryService : IKeyboardHeatmapQueryService
 {
+    private const double MinimumLatencyMs = 20;
+    private const double MaximumLatencyMs = 2000;
+
+    private static readonly QwertyCharacterToKeyMapper KeyMapper = new();
+    private static readonly IReadOnlyDictionary<string, VisualKeyboardKey> LayoutKeys =
+        QwertyVisualKeyboardLayout
+            .Create()
+            .Rows
+            .SelectMany(row => row.Keys)
+            .ToDictionary(key => key.Id, StringComparer.Ordinal);
+
     private readonly SqliteConnectionFactory _connectionFactory;
 
     public KeyboardHeatmapQueryService(SqliteConnectionFactory connectionFactory)
@@ -20,20 +32,106 @@ public sealed class KeyboardHeatmapQueryService : IKeyboardHeatmapQueryService
     {
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         var events = await LoadEventsAsync(connection, modeFilter, cancellationToken).ConfigureAwait(false);
-        var stats = AnalyticsComputation.BuildCharacterStats(events);
+        var samples = events
+            .Select(ToPhysicalKeySample)
+            .OfType<PhysicalKeySample>()
+            .ToArray();
+        var globalMedianLatency = AnalyticsComputation.Median(samples
+            .Select(row => row.DeltaPreviousMs)
+            .Where(IsLatencySample)
+            .Select(value => value!.Value));
 
-        return stats
-            .Select(stat => new KeyboardHeatmapKeyRow(
-                stat.DisplayCharacter,
-                stat.Character.Length == 0 ? '\0' : stat.Character[0],
-                stat.ExposureCount,
-                stat.CorrectCount,
-                stat.IncorrectCount,
-                stat.Accuracy,
-                stat.MedianLatencyMs,
-                stat.WeaknessScore))
+        return samples
+            .GroupBy(sample => sample.KeyId, StringComparer.Ordinal)
+            .Select(group =>
+            {
+                var first = group.First();
+                var exposureCount = group.Count();
+                var correctCount = group.Count(row => row.IsCorrect);
+                var accuracy = AnalyticsComputation.Divide(correctCount, exposureCount);
+                var latencySamples = group
+                    .Select(row => row.DeltaPreviousMs)
+                    .Where(IsLatencySample)
+                    .Select(value => value!.Value)
+                    .ToArray();
+                var medianLatency = AnalyticsComputation.Median(latencySamples);
+
+                return new KeyboardHeatmapKeyRow(
+                    first.KeyLabel,
+                    first.Character,
+                    exposureCount,
+                    correctCount,
+                    exposureCount - correctCount,
+                    accuracy,
+                    medianLatency,
+                    WeaknessScoreCalculator.Calculate(exposureCount, accuracy, medianLatency, globalMedianLatency));
+            })
             .OrderBy(row => row.KeyLabel, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static PhysicalKeySample? ToPhysicalKeySample(AnalyticsKeyEventRow row)
+    {
+        if (string.IsNullOrEmpty(row.ExpectedChar))
+        {
+            return null;
+        }
+
+        var expectedCharacter = row.ExpectedChar[0];
+        var mapping = KeyMapper.Map(expectedCharacter);
+        if (mapping is null)
+        {
+            var fallbackLabel = ToFallbackLabel(expectedCharacter);
+            return new PhysicalKeySample(
+                $"Fallback:{fallbackLabel}",
+                fallbackLabel,
+                expectedCharacter,
+                row.IsCorrect,
+                row.DeltaPreviousMs);
+        }
+
+        var key = LayoutKeys.TryGetValue(mapping.KeyId, out var layoutKey)
+            ? layoutKey
+            : null;
+
+        return new PhysicalKeySample(
+            mapping.KeyId,
+            key?.PrimaryLabel ?? mapping.KeyId,
+            ToRepresentativeCharacter(key, expectedCharacter),
+            row.IsCorrect,
+            row.DeltaPreviousMs);
+    }
+
+    private static char ToRepresentativeCharacter(VisualKeyboardKey? key, char fallback)
+    {
+        if (key?.Output?.Length > 0)
+        {
+            return key.Output[0];
+        }
+
+        return key?.Role switch
+        {
+            KeyRole.Space => ' ',
+            KeyRole.Enter => '\n',
+            KeyRole.Tab => '\t',
+            _ => char.ToLowerInvariant(fallback)
+        };
+    }
+
+    private static string ToFallbackLabel(char character)
+    {
+        return character switch
+        {
+            ' ' => "Space",
+            '\t' => "Tab",
+            '\n' or '\r' => "Enter",
+            _ => character.ToString()
+        };
+    }
+
+    private static bool IsLatencySample(double? value)
+    {
+        return value is >= MinimumLatencyMs and <= MaximumLatencyMs;
     }
 
     private static async Task<IReadOnlyList<AnalyticsKeyEventRow>> LoadEventsAsync(
@@ -74,5 +172,11 @@ public sealed class KeyboardHeatmapQueryService : IKeyboardHeatmapQueryService
 
         return events;
     }
-}
 
+    private sealed record PhysicalKeySample(
+        string KeyId,
+        string KeyLabel,
+        char Character,
+        bool IsCorrect,
+        double? DeltaPreviousMs);
+}
