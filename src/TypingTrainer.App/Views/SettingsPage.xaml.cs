@@ -41,16 +41,6 @@ public sealed partial class SettingsPage : Page
         _isLoaded = true;
     }
 
-    private void PracticeButton_Click(object sender, RoutedEventArgs e)
-    {
-        Frame.Navigate(typeof(PracticePage));
-    }
-
-    private void DashboardButton_Click(object sender, RoutedEventArgs e)
-    {
-        Frame.Navigate(typeof(DashboardPage));
-    }
-
     private void DefaultLessonModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isLoaded)
@@ -125,8 +115,4 @@ public sealed partial class SettingsPage : Page
         await ViewModel.DeletePracticeHistoryAsync();
     }
 
-    private async void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
-    {
-        await ViewModel.SaveAsync();
-    }
 }

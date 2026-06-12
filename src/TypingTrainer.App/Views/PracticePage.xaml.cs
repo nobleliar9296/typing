@@ -117,16 +117,6 @@ public sealed partial class PracticePage : Page
         QueueScrollToCursor();
     }
 
-    private void DashboardButton_Click(object sender, RoutedEventArgs e)
-    {
-        Frame.Navigate(typeof(DashboardPage));
-    }
-
-    private void SettingsButton_Click(object sender, RoutedEventArgs e)
-    {
-        Frame.Navigate(typeof(SettingsPage));
-    }
-
     private async void ViewDashboardButton_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -225,17 +215,14 @@ public sealed partial class PracticePage : Page
         var pageHorizontalPadding = Math.Clamp(32 * scale, 16, 32);
         var pageTopPadding = Math.Clamp(24 * scale, 12, 28);
         var pageBottomPadding = Math.Clamp(18 * scale, 8, 24);
-        PracticeRoot.Padding = new Thickness(
-            pageHorizontalPadding,
-            pageTopPadding,
-            pageHorizontalPadding,
-            pageBottomPadding);
+        PracticeRoot.Padding = new Thickness(0);
+        HeaderGrid.Margin = new Thickness(pageHorizontalPadding, pageTopPadding, pageHorizontalPadding, 0);
+        PracticeContentPanel.Margin = new Thickness(pageHorizontalPadding, 0, pageHorizontalPadding, pageBottomPadding);
         PracticeRoot.RowSpacing = Math.Clamp(18 * scale, 10, 20);
 
         HeaderGrid.RowSpacing = Math.Clamp(10 * scale, 7, 12);
         HeaderTopGrid.ColumnSpacing = Math.Clamp(16 * scale, 10, 16);
         HeaderTopGrid.RowSpacing = Math.Clamp(8 * scale, 6, 8);
-        NavigationPanel.Spacing = Math.Clamp(8 * scale, 5, 8);
         LessonSelectorsPanel.Orientation = stackedSelectors ? Orientation.Vertical : Orientation.Horizontal;
         LessonSelectorsPanel.Spacing = stackedSelectors ? Math.Clamp(7 * scale, 5, 8) : Math.Clamp(14 * scale, 9, 14);
 
@@ -247,8 +234,8 @@ public sealed partial class PracticePage : Page
 
         InputBorder.Padding = new Thickness(Math.Clamp(32 * scale, 16, 32));
         InputBorder.MaxWidth = width < 1200 ? double.PositiveInfinity : 1100;
-        PracticeTextPresenter.DisplayScale = scale;
-        VisualKeyboard.KeyboardScale = keyboardScale;
+        PracticeTextPresenter.DisplayScale = scale * ViewModel.PracticeTextScale;
+        VisualKeyboard.KeyboardScale = keyboardScale * ViewModel.VisualKeyboardScale;
         VisualKeyboard.MaxWidth = width < 900 ? double.PositiveInfinity : 1280;
 
         var headerHeight = HeaderGrid.ActualHeight > 0
@@ -257,8 +244,9 @@ public sealed partial class PracticePage : Page
         var keyboardHeightEstimate = (306 * keyboardScale) + 18;
         var statusAllowance = 62 * scale;
         var availableTextHeight = height
-            - PracticeRoot.Padding.Top
-            - PracticeRoot.Padding.Bottom
+            - 43
+            - HeaderGrid.Margin.Top
+            - PracticeContentPanel.Margin.Bottom
             - PracticeRoot.RowSpacing
             - headerHeight
             - keyboardHeightEstimate
@@ -277,13 +265,10 @@ public sealed partial class PracticePage : Page
 
             Grid.SetRow(TitlePanel, 0);
             Grid.SetColumn(TitlePanel, 0);
-            Grid.SetColumnSpan(TitlePanel, 4);
-            Grid.SetRow(NavigationPanel, 1);
-            Grid.SetColumn(NavigationPanel, 0);
-            Grid.SetColumnSpan(NavigationPanel, 4);
-            Grid.SetRow(LessonSelectorsPanel, 2);
+            Grid.SetColumnSpan(TitlePanel, 3);
+            Grid.SetRow(LessonSelectorsPanel, 1);
             Grid.SetColumn(LessonSelectorsPanel, 0);
-            Grid.SetColumnSpan(LessonSelectorsPanel, 4);
+            Grid.SetColumnSpan(LessonSelectorsPanel, 3);
             LessonSelectorsPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
             return;
         }
@@ -295,12 +280,9 @@ public sealed partial class PracticePage : Page
 
             Grid.SetRow(TitlePanel, 0);
             Grid.SetColumn(TitlePanel, 0);
-            Grid.SetColumnSpan(TitlePanel, 4);
-            Grid.SetRow(NavigationPanel, 1);
-            Grid.SetColumn(NavigationPanel, 0);
-            Grid.SetColumnSpan(NavigationPanel, 2);
+            Grid.SetColumnSpan(TitlePanel, 3);
             Grid.SetRow(LessonSelectorsPanel, 1);
-            Grid.SetColumn(LessonSelectorsPanel, 3);
+            Grid.SetColumn(LessonSelectorsPanel, 2);
             Grid.SetColumnSpan(LessonSelectorsPanel, 1);
             LessonSelectorsPanel.HorizontalAlignment = HorizontalAlignment.Right;
             return;
@@ -312,11 +294,8 @@ public sealed partial class PracticePage : Page
         Grid.SetRow(TitlePanel, 0);
         Grid.SetColumn(TitlePanel, 0);
         Grid.SetColumnSpan(TitlePanel, 1);
-        Grid.SetRow(NavigationPanel, 0);
-        Grid.SetColumn(NavigationPanel, 1);
-        Grid.SetColumnSpan(NavigationPanel, 1);
         Grid.SetRow(LessonSelectorsPanel, 0);
-        Grid.SetColumn(LessonSelectorsPanel, 3);
+        Grid.SetColumn(LessonSelectorsPanel, 2);
         Grid.SetColumnSpan(LessonSelectorsPanel, 1);
         LessonSelectorsPanel.HorizontalAlignment = HorizontalAlignment.Right;
     }

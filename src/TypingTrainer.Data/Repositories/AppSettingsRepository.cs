@@ -42,6 +42,8 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             GetBool(values, "visualKeyboard.showFingerColors", defaults.ShowFingerColors),
             GetBool(values, "visualKeyboard.showFingerLabels", defaults.ShowFingerLabels),
             GetString(values, "visualKeyboard.layout", defaults.VisualKeyboardLayout),
+            GetClampedInt(values, "practice.textScalePercent", defaults.PracticeTextScalePercent, 70, 130),
+            GetClampedInt(values, "visualKeyboard.scalePercent", defaults.VisualKeyboardScalePercent, 70, 130),
             GetClampedInt(values, "goals.targetNetWpm", defaults.GoalTargetNetWpm, 10, 250),
             GetClampedInt(values, "goals.targetAccuracyPercent", defaults.GoalTargetAccuracyPercent, 50, 100),
             GetClampedInt(values, "goals.weeklyPracticeMinutes", defaults.GoalWeeklyPracticeMinutes, 0, 10_080));
@@ -66,6 +68,8 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.showFingerColors", Bool(settings.ShowFingerColors), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.showFingerLabels", Bool(settings.ShowFingerLabels), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.layout", settings.VisualKeyboardLayout, cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.textScalePercent", settings.PracticeTextScalePercent.ToString(), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.scalePercent", settings.VisualKeyboardScalePercent.ToString(), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetNetWpm", settings.GoalTargetNetWpm.ToString(), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetAccuracyPercent", settings.GoalTargetAccuracyPercent.ToString(), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.weeklyPracticeMinutes", settings.GoalWeeklyPracticeMinutes.ToString(), cancellationToken).ConfigureAwait(false);

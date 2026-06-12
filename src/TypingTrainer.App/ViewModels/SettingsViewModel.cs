@@ -24,6 +24,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     private string _importPackName = string.Empty;
     private string _importStatus = string.Empty;
     private bool _isImporting;
+    private bool _isLoadingSettings;
+    private bool _hasLoadedSettings;
+    private CancellationTokenSource? _settingsAutosaveCancellation;
     private string _settingsStatus = string.Empty;
     private string _exportPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -129,6 +132,22 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         get => _settings.VisualKeyboardLayout;
         set => UpdateSettings(_settings with { VisualKeyboardLayout = value });
     }
+
+    public int PracticeTextScalePercent
+    {
+        get => _settings.PracticeTextScalePercent;
+        set => UpdateSettings(_settings with { PracticeTextScalePercent = Math.Clamp(value, 70, 130) });
+    }
+
+    public int VisualKeyboardScalePercent
+    {
+        get => _settings.VisualKeyboardScalePercent;
+        set => UpdateSettings(_settings with { VisualKeyboardScalePercent = Math.Clamp(value, 70, 130) });
+    }
+
+    public string PracticeTextScaleText => $"{PracticeTextScalePercent}%";
+
+    public string VisualKeyboardScaleText => $"{VisualKeyboardScalePercent}%";
 
     public string ImportFilePath
     {
@@ -251,13 +270,25 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        _settings = await _settingsRepository.GetSettingsAsync(cancellationToken);
-        await RefreshContentPacksAsync(cancellationToken);
-        OnAllSettingsChanged();
+        _isLoadingSettings = true;
+        try
+        {
+            _settings = await _settingsRepository.GetSettingsAsync(cancellationToken);
+            await RefreshContentPacksAsync(cancellationToken);
+            _hasLoadedSettings = true;
+            SettingsStatus = "Settings autosave is on.";
+            OnAllSettingsChanged();
+        }
+        finally
+        {
+            _isLoadingSettings = false;
+        }
     }
 
     public async Task SaveAsync(CancellationToken cancellationToken = default)
     {
+        _settingsAutosaveCancellation?.Cancel();
+        SettingsStatus = "Saving...";
         await _settingsRepository.SaveSettingsAsync(_settings, cancellationToken);
         SettingsStatus = "Settings saved.";
     }
@@ -348,8 +379,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     private void UpdateSettings(AppSettings settings)
     {
+        if (_settings == settings)
+        {
+            return;
+        }
+
         _settings = settings;
         OnAllSettingsChanged();
+        QueueSettingsAutosave();
     }
 
     private void OnAllSettingsChanged()
@@ -368,6 +405,59 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ShowFingerColors));
         OnPropertyChanged(nameof(ShowFingerLabels));
         OnPropertyChanged(nameof(VisualKeyboardLayout));
+        OnPropertyChanged(nameof(PracticeTextScalePercent));
+        OnPropertyChanged(nameof(VisualKeyboardScalePercent));
+        OnPropertyChanged(nameof(PracticeTextScaleText));
+        OnPropertyChanged(nameof(VisualKeyboardScaleText));
+    }
+
+    private void QueueSettingsAutosave()
+    {
+        if (_isLoadingSettings || !_hasLoadedSettings)
+        {
+            return;
+        }
+
+        SettingsStatus = "Saving...";
+        _settingsAutosaveCancellation?.Cancel();
+
+        var cancellation = new CancellationTokenSource();
+        _settingsAutosaveCancellation = cancellation;
+        _ = SaveSettingsAfterDebounceAsync(cancellation);
+    }
+
+    private async Task SaveSettingsAfterDebounceAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(500, cancellation.Token);
+            await _settingsRepository.SaveSettingsAsync(_settings, cancellation.Token);
+
+            if (ReferenceEquals(_settingsAutosaveCancellation, cancellation))
+            {
+                SettingsStatus = "Settings saved.";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer settings change replaced this pending save.
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(_settingsAutosaveCancellation, cancellation))
+            {
+                SettingsStatus = $"Settings autosave failed: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_settingsAutosaveCancellation, cancellation))
+            {
+                _settingsAutosaveCancellation = null;
+            }
+
+            cancellation.Dispose();
+        }
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

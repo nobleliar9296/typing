@@ -245,6 +245,10 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public bool ShowFingerLabels => _settings.ShowFingerLabels;
 
+    public double PracticeTextScale => _settings.PracticeTextScalePercent / 100.0;
+
+    public double VisualKeyboardScale => _settings.VisualKeyboardScalePercent / 100.0;
+
     public Visibility VisualKeyboardVisibility => ShowVisualKeyboard
         ? Visibility.Visible
         : Visibility.Collapsed;
@@ -502,6 +506,8 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ShowVisualKeyboard));
         OnPropertyChanged(nameof(ShowFingerColors));
         OnPropertyChanged(nameof(ShowFingerLabels));
+        OnPropertyChanged(nameof(PracticeTextScale));
+        OnPropertyChanged(nameof(VisualKeyboardScale));
         OnPropertyChanged(nameof(VisualKeyboardVisibility));
         OnKeyboardHighlightChanged();
     }

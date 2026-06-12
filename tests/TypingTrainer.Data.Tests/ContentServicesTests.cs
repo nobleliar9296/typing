@@ -210,6 +210,8 @@ public sealed class ContentServicesTests
         Assert.IsTrue(settings.ShowFingerColors);
         Assert.IsFalse(settings.ShowFingerLabels);
         Assert.AreEqual(AppSettings.QwertyKeyboardLayout, settings.VisualKeyboardLayout);
+        Assert.AreEqual(100, settings.PracticeTextScalePercent);
+        Assert.AreEqual(100, settings.VisualKeyboardScalePercent);
         Assert.AreEqual(60, settings.GoalTargetNetWpm);
         Assert.AreEqual(95, settings.GoalTargetAccuracyPercent);
         Assert.AreEqual(75, settings.GoalWeeklyPracticeMinutes);
@@ -300,6 +302,46 @@ public sealed class ContentServicesTests
         Assert.IsFalse(settings.ShowFingerColors);
         Assert.IsTrue(settings.ShowFingerLabels);
         Assert.AreEqual(AppSettings.QwertyKeyboardLayout, settings.VisualKeyboardLayout);
+    }
+
+    [TestMethod]
+    public async Task AppSettingsRepository_DefaultDisplayScaleSettings_AreOneHundredPercent()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+
+        var settings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual(100, settings.PracticeTextScalePercent);
+        Assert.AreEqual(100, settings.VisualKeyboardScalePercent);
+    }
+
+    [TestMethod]
+    public async Task AppSettingsRepository_SaveDisplayScaleSettings_Persists()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+
+        await database.SettingsRepository.SaveSettingsAsync(AppSettings.Defaults with
+        {
+            PracticeTextScalePercent = 115,
+            VisualKeyboardScalePercent = 85
+        });
+        var settings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual(115, settings.PracticeTextScalePercent);
+        Assert.AreEqual(85, settings.VisualKeyboardScalePercent);
+    }
+
+    [TestMethod]
+    public async Task AppSettingsRepository_DisplayScaleSettings_ClampStoredValues()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        await database.SetRawSettingAsync("practice.textScalePercent", "10");
+        await database.SetRawSettingAsync("visualKeyboard.scalePercent", "200");
+
+        var settings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual(70, settings.PracticeTextScalePercent);
+        Assert.AreEqual(130, settings.VisualKeyboardScalePercent);
     }
 
     [TestMethod]
@@ -400,6 +442,20 @@ public sealed class ContentServicesTests
             using var writer = new StreamWriter(path);
             writer.Write(content);
             return path;
+        }
+
+        public async Task SetRawSettingAsync(string key, string value)
+        {
+            await using var connection = await ConnectionFactory.OpenConnectionAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO app_settings (key, value)
+                VALUES ($key, $value)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+                """;
+            command.Parameters.AddWithValue("$key", key);
+            command.Parameters.AddWithValue("$value", value);
+            await command.ExecuteNonQueryAsync();
         }
 
         public ValueTask DisposeAsync()

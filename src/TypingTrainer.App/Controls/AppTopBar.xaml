@@ -1,0 +1,47 @@
+<UserControl
+    x:Class="TypingTrainer.App.Controls.AppTopBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    MinHeight="42">
+    <Border
+        Padding="18,6"
+        Background="#1B1B1B"
+        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+        BorderThickness="0,0,0,1">
+        <Grid ColumnSpacing="18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock
+                Text="TypingTrainer"
+                FontSize="15"
+                FontWeight="SemiBold"
+                VerticalAlignment="Center" />
+
+            <StackPanel
+                Grid.Column="1"
+                Orientation="Horizontal"
+                Spacing="2"
+                VerticalAlignment="Center">
+                <Button
+                    x:Name="PracticeButton"
+                    Content="Practice"
+                    Click="PracticeButton_Click"
+                    Padding="14,5" />
+                <Button
+                    x:Name="DashboardButton"
+                    Content="Dashboard"
+                    Click="DashboardButton_Click"
+                    Padding="14,5" />
+                <Button
+                    x:Name="SettingsButton"
+                    Content="Settings"
+                    Click="SettingsButton_Click"
+                    Padding="14,5" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

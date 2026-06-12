@@ -8,17 +8,21 @@
 
     <Grid
         x:Name="PracticeRoot"
-        Padding="32"
         RowSpacing="24"
         SizeChanged="PracticeRoot_SizeChanged"
         PointerPressed="PracticeRoot_PointerPressed">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <controls:AppTopBar ActivePage="Practice" />
+
         <Grid
             x:Name="HeaderGrid"
+            Grid.Row="1"
+            Margin="32,24,32,0"
             RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -37,7 +41,6 @@
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="HeaderTitleColumn" Width="Auto" />
-                    <ColumnDefinition x:Name="HeaderNavigationColumn" Width="Auto" />
                     <ColumnDefinition x:Name="HeaderSpacerColumn" Width="*" />
                     <ColumnDefinition x:Name="HeaderControlsColumn" Width="Auto" />
                 </Grid.ColumnDefinitions>
@@ -59,19 +62,8 @@
                 </StackPanel>
 
                 <StackPanel
-                    x:Name="NavigationPanel"
-                    Grid.Column="1"
-                    Orientation="Horizontal"
-                    Spacing="8"
-                    VerticalAlignment="Center">
-                    <Button Content="Practice" IsEnabled="False" />
-                    <Button Content="Dashboard" Click="DashboardButton_Click" />
-                    <Button Content="Settings" Click="SettingsButton_Click" />
-                </StackPanel>
-
-                <StackPanel
                     x:Name="LessonSelectorsPanel"
-                    Grid.Column="3"
+                    Grid.Column="2"
                     Orientation="Horizontal"
                     Spacing="14"
                     HorizontalAlignment="Right"
@@ -213,7 +205,9 @@
         </Grid>
 
         <StackPanel
-            Grid.Row="1"
+            x:Name="PracticeContentPanel"
+            Grid.Row="2"
+            Margin="32,0,32,0"
             Spacing="18"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Top">

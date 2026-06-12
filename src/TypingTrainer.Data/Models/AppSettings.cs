@@ -15,6 +15,8 @@ public sealed record AppSettings(
     bool ShowFingerColors,
     bool ShowFingerLabels,
     string VisualKeyboardLayout,
+    int PracticeTextScalePercent,
+    int VisualKeyboardScalePercent,
     int GoalTargetNetWpm,
     int GoalTargetAccuracyPercent,
     int GoalWeeklyPracticeMinutes)
@@ -37,6 +39,8 @@ public sealed record AppSettings(
         ShowFingerColors: true,
         ShowFingerLabels: false,
         VisualKeyboardLayout: QwertyKeyboardLayout,
+        PracticeTextScalePercent: 100,
+        VisualKeyboardScalePercent: 100,
         GoalTargetNetWpm: 60,
         GoalTargetAccuracyPercent: 95,
         GoalWeeklyPracticeMinutes: 75);

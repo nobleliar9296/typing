@@ -31,16 +31,6 @@ public sealed partial class DashboardPage : Page
         await ViewModel.SaveGoalsAsync();
     }
 
-    private void PracticeButton_Click(object sender, RoutedEventArgs e)
-    {
-        Frame.Navigate(typeof(PracticePage));
-    }
-
-    private void SettingsButton_Click(object sender, RoutedEventArgs e)
-    {
-        Frame.Navigate(typeof(SettingsPage));
-    }
-
     private async void RangeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isLoaded)

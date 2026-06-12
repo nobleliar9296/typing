@@ -6,33 +6,34 @@
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
     Loaded="DashboardPage_Loaded">
 
-    <Grid Padding="32" RowSpacing="24">
+    <Grid RowSpacing="24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid ColumnSpacing="24">
+        <controls:AppTopBar ActivePage="Dashboard" />
+
+        <Grid Grid.Row="1" Margin="32,24,32,0" ColumnSpacing="24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Spacing="10">
+            <StackPanel Spacing="3">
                 <TextBlock
-                    Text="TypingTrainer"
+                    Text="Analytics"
                     FontSize="28"
                     FontWeight="SemiBold" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Practice" Click="PracticeButton_Click" />
-                    <Button Content="Dashboard" IsEnabled="False" />
-                    <Button Content="Settings" Click="SettingsButton_Click" />
-                </StackPanel>
+                <TextBlock
+                    Text="Local typing performance, trends, and practice goals"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
 
             <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
                 <TextBlock
-                    Text="Analytics"
+                    Text="Range"
                     HorizontalAlignment="Right"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 <ComboBox
@@ -47,7 +48,7 @@
             </StackPanel>
         </Grid>
 
-        <ScrollViewer Grid.Row="1">
+        <ScrollViewer Grid.Row="2" Margin="32,0,32,24">
             <StackPanel Spacing="24">
                 <ProgressRing
                     Width="32"

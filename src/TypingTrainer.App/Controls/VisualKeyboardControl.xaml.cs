@@ -304,6 +304,6 @@ public sealed partial class VisualKeyboardControl : UserControl
 
     private double GetScale()
     {
-        return Math.Clamp(KeyboardScale, 0.58, 1.0);
+        return Math.Clamp(KeyboardScale, 0.45, 1.3);
     }
 }

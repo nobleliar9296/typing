@@ -71,7 +71,7 @@ public sealed class PracticeTextPresenter : UserControl
 
     private void ApplyDisplayScale()
     {
-        var scale = Math.Clamp(DisplayScale, 0.68, 1.0);
+        var scale = Math.Clamp(DisplayScale, 0.5, 1.3);
         _textBlock.FontSize = 34 * scale;
         _textBlock.LineHeight = 48 * scale;
     }
