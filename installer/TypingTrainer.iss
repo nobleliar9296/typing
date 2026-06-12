@@ -1,7 +1,30 @@
-#define AppName "Typing Trainer"
-#define AppExeName "TypingTrainer.App.exe"
-#define AppPublisher "Typing Trainer"
-#define AppVersion "1.0.0"
+#ifndef AppName
+  #define AppName "Typing Trainer"
+#endif
+
+#ifndef AppExeName
+  #define AppExeName "TypingTrainer.App.exe"
+#endif
+
+#ifndef AppPublisher
+  #define AppPublisher "Gundeep Sidhu"
+#endif
+
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
+
+#ifndef AppVersionQuad
+  #define AppVersionQuad "1.0.0.0"
+#endif
+
+#ifndef AppPublisherUrl
+  #define AppPublisherUrl "https://gundeepsidhu.dev"
+#endif
+
+#ifndef AppCopyright
+  #define AppCopyright "Copyright (c) Gundeep Sidhu"
+#endif
 
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\TypingTrainer.App"
@@ -20,6 +43,10 @@ AppId={{1DD7B52B-1D79-47F3-9D9F-F53A7E60B768}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
+AppPublisherURL={#AppPublisherUrl}
+AppSupportURL={#AppPublisherUrl}
+AppUpdatesURL={#AppPublisherUrl}
+AppCopyright={#AppCopyright}
 DefaultDirName={autopf}\Typing Trainer
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -34,6 +61,12 @@ PrivilegesRequired=admin
 UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExeName}
 SetupIconFile={#AppIconFile}
+VersionInfoCompany={#AppPublisher}
+VersionInfoCopyright={#AppCopyright}
+VersionInfoDescription={#AppName} installer
+VersionInfoProductName={#AppName}
+VersionInfoProductVersion={#AppVersion}
+VersionInfoVersion={#AppVersionQuad}
 WizardStyle=modern
 CloseApplications=yes
 CloseApplicationsFilter={#AppExeName}

@@ -152,6 +152,93 @@ function Draw-AppMark {
     }
 }
 
+function Draw-SmallAppMark {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Drawing.Graphics]$Graphics,
+
+        [Parameter(Mandatory = $true)]
+        [float]$X,
+
+        [Parameter(Mandatory = $true)]
+        [float]$Y,
+
+        [Parameter(Mandatory = $true)]
+        [float]$Size
+    )
+
+    $tileInset = [Math]::Max(1.0, $Size * 0.08)
+    $tileSize = $Size - ($tileInset * 2)
+    $tileRadius = [Math]::Max(2.0, $Size * 0.16)
+    $tileRect = [System.Drawing.RectangleF]::new($X + $tileInset, $Y + $tileInset, $tileSize, $tileSize)
+    $tileBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 13, 67, 84))
+    try {
+        Fill-RoundedRectangle -Graphics $Graphics -Brush $tileBrush -X $tileRect.X -Y $tileRect.Y -Width $tileRect.Width -Height $tileRect.Height -Radius $tileRadius
+    }
+    finally {
+        $tileBrush.Dispose()
+    }
+
+    $keyX = $X + ($Size * 0.23)
+    $keyY = $Y + ($Size * 0.31)
+    $keyW = $Size * 0.54
+    $keyH = $Size * 0.38
+    $keyRadius = [Math]::Max(1.0, $Size * 0.08)
+    $keyBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 245, 248, 252))
+    try {
+        Fill-RoundedRectangle -Graphics $Graphics -Brush $keyBrush -X $keyX -Y $keyY -Width $keyW -Height $keyH -Radius $keyRadius
+    }
+    finally {
+        $keyBrush.Dispose()
+    }
+
+    $blueBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 16, 94, 181))
+    $greenBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 40, 203, 140))
+    try {
+        $barH = [Math]::Max(1.0, [Math]::Round($Size * 0.08))
+        $stemW = [Math]::Max(1.0, [Math]::Round($Size * 0.09))
+        $textTop = [Math]::Round($keyY + ($keyH * 0.28))
+        $textLeft = [Math]::Round($keyX + ($keyW * 0.22))
+        $textW = [Math]::Max(2.0, [Math]::Round($keyW * 0.34))
+
+        $Graphics.FillRectangle($blueBrush, $textLeft, $textTop, $textW, $barH)
+        $Graphics.FillRectangle($blueBrush, $textLeft + (($textW - $stemW) / 2), $textTop, $stemW, $keyH * 0.42)
+
+        $caretW = [Math]::Max(1.0, [Math]::Round($Size * 0.09))
+        $caretH = $keyH * 0.56
+        $caretX = [Math]::Round($keyX + ($keyW * 0.62))
+        $caretY = [Math]::Round($keyY + ($keyH * 0.22))
+        $Graphics.FillRectangle($greenBrush, $caretX, $caretY, $caretW, $caretH)
+    }
+    finally {
+        $blueBrush.Dispose()
+        $greenBrush.Dispose()
+    }
+}
+
+function Draw-AppMarkForIconSize {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Drawing.Graphics]$Graphics,
+
+        [Parameter(Mandatory = $true)]
+        [float]$X,
+
+        [Parameter(Mandatory = $true)]
+        [float]$Y,
+
+        [Parameter(Mandatory = $true)]
+        [float]$Size
+    )
+
+    if ($Size -le 32) {
+        Draw-SmallAppMark -Graphics $Graphics -X $X -Y $Y -Size $Size
+        return
+    }
+
+    Draw-AppMark -Graphics $Graphics -X $X -Y $Y -Size $Size
+}
+
 function New-TransparentBitmap {
     param(
         [Parameter(Mandatory = $true)]
@@ -307,7 +394,7 @@ foreach ($size in $iconSizes) {
     $memoryStream = [System.IO.MemoryStream]::new()
 
     try {
-        Draw-AppMark -Graphics $surface.Graphics -X 0 -Y 0 -Size $size
+        Draw-AppMarkForIconSize -Graphics $surface.Graphics -X 0 -Y 0 -Size $size
         $surface.Bitmap.Save($memoryStream, [System.Drawing.Imaging.ImageFormat]::Png)
         $pngBytesBySize[$size] = $memoryStream.ToArray()
     }

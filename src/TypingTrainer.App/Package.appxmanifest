@@ -6,12 +6,12 @@
 
   <Identity
     Name="TypingTrainer.App"
-    Publisher="CN=TypingTrainer"
+    Publisher="CN=Gundeep Sidhu"
     Version="1.0.0.0" />
 
   <Properties>
-    <DisplayName>TypingTrainer</DisplayName>
-    <PublisherDisplayName>TypingTrainer</PublisherDisplayName>
+    <DisplayName>Typing Trainer</DisplayName>
+    <PublisherDisplayName>Gundeep Sidhu</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -32,8 +32,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="TypingTrainer"
-        Description="TypingTrainer"
+        DisplayName="Typing Trainer"
+        Description="Typing Trainer"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
