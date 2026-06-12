@@ -438,7 +438,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Spacing="2">
                                         <TextBlock Text="Session Net WPM" FontSize="18" FontWeight="SemiBold" />
-                                        <TextBlock Text="Hover over the line to inspect pace changes." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="Hover over the line to inspect pace changes after warm-up." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </StackPanel>
                                     <StackPanel
                                         Grid.Column="1"

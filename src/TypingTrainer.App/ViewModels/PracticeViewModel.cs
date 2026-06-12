@@ -16,6 +16,9 @@ namespace TypingTrainer.App.ViewModels;
 
 public sealed class PracticeViewModel : INotifyPropertyChanged
 {
+    private const double SessionNetWpmWarmupMs = 3_000;
+    private const int SessionNetWpmWarmupKeypresses = 12;
+
     private readonly ISessionPersistenceQueue _sessionPersistenceQueue;
     private readonly ILessonService _lessonService;
     private readonly SessionReviewGenerator _reviewGenerator = new();
@@ -388,7 +391,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public string CompletionErrorsText => (_lastSummary?.CurrentErrors ?? 0).ToString(CultureInfo.InvariantCulture);
 
-    public IReadOnlyList<ChartPointViewModel> SessionNetWpmPoints => _sessionNetWpmSamples
+    public IReadOnlyList<ChartPointViewModel> SessionNetWpmPoints => GetSessionNetWpmChartSamples()
         .Select(sample => new ChartPointViewModel(
             FormatElapsedLabel(sample.ElapsedMs),
             sample.NetWpm))
@@ -560,14 +563,15 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public bool StartRetryFromNetWpmPoint(int pointIndex)
     {
-        if (_lastSummary is null || _sessionNetWpmSamples.Count == 0)
+        var chartSamples = GetSessionNetWpmChartSamples();
+        if (_lastSummary is null || chartSamples.Count == 0)
         {
             ReviewRetryStatus = "No completed session text is available for retry.";
             return false;
         }
 
-        var boundedIndex = Math.Clamp(pointIndex, 0, _sessionNetWpmSamples.Count - 1);
-        var sample = _sessionNetWpmSamples[boundedIndex];
+        var boundedIndex = Math.Clamp(pointIndex, 0, chartSamples.Count - 1);
+        var sample = chartSamples[boundedIndex];
         var retryText = ExtractRetrySlice(_lastSummary.TargetText, sample.CursorIndex, 220);
         if (string.IsNullOrWhiteSpace(retryText))
         {
@@ -967,19 +971,33 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _sessionNetWpmSamples.Add(new SessionNetWpmSample(
             Math.Max(0, snapshot.ElapsedMs),
             CalculateLiveNetWpm(snapshot),
-            Math.Clamp(snapshot.CursorIndex, 0, snapshot.TargetText.Length)));
+            Math.Clamp(snapshot.CursorIndex, 0, snapshot.TargetText.Length),
+            snapshot.TypedCharacterKeypresses));
         OnSessionNetWpmChanged();
     }
 
     private string FormatNetWpmExtreme(string label, Func<IReadOnlyList<double>, double> selector)
     {
-        var samples = _sessionNetWpmSamples
+        var samples = GetSessionNetWpmChartSamples()
             .Select(sample => sample.NetWpm)
-            .Where(value => value > 0)
             .ToArray();
         return samples.Length == 0
             ? $"{label}: --"
             : $"{label}: {selector(samples):0.0} WPM";
+    }
+
+    private IReadOnlyList<SessionNetWpmSample> GetSessionNetWpmChartSamples()
+    {
+        return _sessionNetWpmSamples
+            .Where(IsStableSessionNetWpmSample)
+            .ToArray();
+    }
+
+    private static bool IsStableSessionNetWpmSample(SessionNetWpmSample sample)
+    {
+        return sample.ElapsedMs >= SessionNetWpmWarmupMs
+            && sample.TypedKeypresses >= SessionNetWpmWarmupKeypresses
+            && sample.NetWpm > 0;
     }
 
     private static string FormatElapsedLabel(double elapsedMs)
@@ -994,7 +1012,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             return ("What to fix next", "Complete a session to unlock targeted review guidance.");
         }
 
-        if (HasFatiguePattern(_sessionNetWpmSamples, _lastCompletedEvents))
+        if (HasFatiguePattern(GetSessionNetWpmChartSamples(), _lastCompletedEvents))
         {
             return ("Shorten the next run", "Your pace faded late while errors rose. Use a shorter paragraph or Zen Mode and stop before fatigue sets in.");
         }
@@ -1286,7 +1304,8 @@ public sealed record CostlyMistakeRow(
 public sealed record SessionNetWpmSample(
     double ElapsedMs,
     double NetWpm,
-    int CursorIndex);
+    int CursorIndex,
+    int TypedKeypresses);
 
 public enum PracticeInputFeedback
 {
