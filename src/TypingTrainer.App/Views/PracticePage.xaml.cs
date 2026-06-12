@@ -132,6 +132,12 @@ public sealed partial class PracticePage : Page
         QueueScrollToCursor(animate: false);
     }
 
+    private void CloseReviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.DismissReviewPopup();
+        FocusTypingSurface(FocusState.Programmatic);
+    }
+
     private async void NextLessonButton_Click(object sender, RoutedEventArgs e)
     {
         await ViewModel.GenerateNextLessonAsync();

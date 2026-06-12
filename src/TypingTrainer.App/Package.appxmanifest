@@ -7,7 +7,7 @@
   <Identity
     Name="TypingTrainer.App"
     Publisher="CN=Gundeep Sidhu"
-    Version="1.0.1.0" />
+    Version="1.0.2.0" />
 
   <Properties>
     <DisplayName>Typing Trainer</DisplayName>

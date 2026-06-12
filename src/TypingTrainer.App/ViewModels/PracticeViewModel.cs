@@ -31,6 +31,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private bool _completionQueued;
     private bool _isGeneratingLesson;
     private bool _isPaused;
+    private bool _isReviewPopupDismissed;
     private bool _isStopped;
     private long? _lastEscapeTimestampTicks;
     private int _sessionGeneration;
@@ -196,11 +197,11 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public bool IsInputEnabled => !IsGeneratingLesson && !_completionQueued;
 
-    public Visibility ReviewPopupVisibility => _completionQueued
+    public Visibility ReviewPopupVisibility => _completionQueued && !_isReviewPopupDismissed
         ? Visibility.Visible
         : Visibility.Collapsed;
 
-    public double PracticeContentOpacity => _completionQueued ? 0.38 : 1.0;
+    public double PracticeContentOpacity => ReviewPopupVisibility == Visibility.Visible ? 0.52 : 1.0;
 
     public string CompletionStatus
     {
@@ -385,6 +386,17 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         StartSession(_currentLesson, _activeLessonMode);
     }
 
+    public void DismissReviewPopup()
+    {
+        if (!_completionQueued || _isReviewPopupDismissed)
+        {
+            return;
+        }
+
+        _isReviewPopupDismissed = true;
+        OnCompletionChanged();
+    }
+
     public async Task PracticeMistakesAsync(CancellationToken cancellationToken = default)
     {
         if (_lastReview is null || !CanPracticeMistakes)
@@ -424,6 +436,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             : lesson.Text,
             CreateTypingSessionOptions());
         _completionQueued = false;
+        _isReviewPopupDismissed = false;
         IsPaused = false;
         _isStopped = false;
         _lastEscapeTimestampTicks = null;
@@ -470,6 +483,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         if (result.State.IsComplete && !_completionQueued)
         {
             _completionQueued = true;
+            _isReviewPopupDismissed = false;
             var completedSession = _session;
             var completedGeneration = _sessionGeneration;
             var completedMode = _activeLessonMode;

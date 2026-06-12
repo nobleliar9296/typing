@@ -292,20 +292,35 @@
         <Grid
             x:Name="ReviewOverlay"
             Grid.RowSpan="3"
-            Background="#A80A0F16"
+            Background="#CC0A0F16"
             Visibility="{Binding ReviewPopupVisibility}">
             <Border
                 MaxWidth="1040"
-                Margin="32"
-                Padding="22"
+                Margin="48"
+                Padding="28"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                 BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="8">
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Button
+                        Width="34"
+                        Height="34"
+                        Padding="0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Click="CloseReviewButton_Click">
+                        <FontIcon FontSize="14" Glyph="&#xE711;" />
+                    </Button>
                 <ScrollViewer
-                    MaxHeight="720"
+                    Grid.Row="1"
+                    MaxHeight="676"
                     HorizontalScrollBarVisibility="Disabled"
                     VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="18">
@@ -457,6 +472,7 @@
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
+                </Grid>
             </Border>
         </Grid>
     </Grid>
