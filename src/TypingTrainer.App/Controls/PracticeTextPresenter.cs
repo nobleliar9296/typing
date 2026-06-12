@@ -16,6 +16,12 @@ public sealed class PracticeTextPresenter : UserControl
         typeof(PracticeTextPresenter),
         new PropertyMetadata(null, OnStateChanged));
 
+    public static readonly DependencyProperty DisplayScaleProperty = DependencyProperty.Register(
+        nameof(DisplayScale),
+        typeof(double),
+        typeof(PracticeTextPresenter),
+        new PropertyMetadata(1.0, OnDisplayScaleChanged));
+
     private static readonly SolidColorBrush CorrectBrush = new(Color.FromArgb(255, 32, 145, 108));
     private static readonly SolidColorBrush IncorrectBrush = new(Color.FromArgb(255, 196, 43, 55));
     private static readonly SolidColorBrush CurrentBrush = new(Color.FromArgb(255, 0, 95, 184));
@@ -32,6 +38,7 @@ public sealed class PracticeTextPresenter : UserControl
     public PracticeTextPresenter()
     {
         Content = _textBlock;
+        ApplyDisplayScale();
     }
 
     public TypingStateSnapshot? State
@@ -40,12 +47,33 @@ public sealed class PracticeTextPresenter : UserControl
         set => SetValue(StateProperty, value);
     }
 
+    public double DisplayScale
+    {
+        get => (double)GetValue(DisplayScaleProperty);
+        set => SetValue(DisplayScaleProperty, value);
+    }
+
     private static void OnStateChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
     {
         if (dependencyObject is PracticeTextPresenter presenter)
         {
             presenter.Render();
         }
+    }
+
+    private static void OnDisplayScaleChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
+    {
+        if (dependencyObject is PracticeTextPresenter presenter)
+        {
+            presenter.ApplyDisplayScale();
+        }
+    }
+
+    private void ApplyDisplayScale()
+    {
+        var scale = Math.Clamp(DisplayScale, 0.68, 1.0);
+        _textBlock.FontSize = 34 * scale;
+        _textBlock.LineHeight = 48 * scale;
     }
 
     private void Render()

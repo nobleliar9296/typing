@@ -39,6 +39,12 @@ public sealed partial class VisualKeyboardControl : UserControl
         typeof(VisualKeyboardControl),
         new PropertyMetadata(false, OnAppearanceChanged));
 
+    public static readonly DependencyProperty KeyboardScaleProperty = DependencyProperty.Register(
+        nameof(KeyboardScale),
+        typeof(double),
+        typeof(VisualKeyboardControl),
+        new PropertyMetadata(1.0, OnAppearanceChanged));
+
     private static readonly SolidColorBrush NeutralKeyBrush = Brush(82, 88, 92);
     private static readonly SolidColorBrush NeutralBorderBrush = Brush(54, 57, 60);
     private static readonly SolidColorBrush NormalTextBrush = Brush(224, 226, 228);
@@ -86,6 +92,12 @@ public sealed partial class VisualKeyboardControl : UserControl
         set => SetValue(ShowFingerLabelsProperty, value);
     }
 
+    public double KeyboardScale
+    {
+        get => (double)GetValue(KeyboardScaleProperty);
+        set => SetValue(KeyboardScaleProperty, value);
+    }
+
     private static void OnLayoutChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
     {
         if (dependencyObject is VisualKeyboardControl control)
@@ -121,11 +133,15 @@ public sealed partial class VisualKeyboardControl : UserControl
             return;
         }
 
+        var scale = GetScale();
+        KeyboardFrame.Padding = new Thickness(12 * scale);
+        RowsPanel.Spacing = scale < 0.75 ? 0 : 1;
+
         foreach (var row in Layout.Rows)
         {
             var rowGrid = new Grid
             {
-                ColumnSpacing = 1,
+                ColumnSpacing = scale < 0.75 ? 0 : 1,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
@@ -137,7 +153,7 @@ public sealed partial class VisualKeyboardControl : UserControl
                     Width = new GridLength(Math.Max(0.25, key.WidthUnits), GridUnitType.Star)
                 });
 
-                var keyVisual = CreateKeyVisual(key);
+                var keyVisual = CreateKeyVisual(key, scale);
                 Grid.SetColumn(keyVisual, index);
                 rowGrid.Children.Add(keyVisual);
 
@@ -151,7 +167,7 @@ public sealed partial class VisualKeyboardControl : UserControl
         UpdateKeyStyles();
     }
 
-    private Border CreateKeyVisual(VisualKeyboardKey key)
+    private Border CreateKeyVisual(VisualKeyboardKey key, double scale)
     {
         var labels = new StackPanel
         {
@@ -162,20 +178,20 @@ public sealed partial class VisualKeyboardControl : UserControl
 
         if (!string.IsNullOrEmpty(key.SecondaryLabel))
         {
-            labels.Children.Add(CreateLabel(key.SecondaryLabel, 12, 0.74));
+            labels.Children.Add(CreateLabel(key.SecondaryLabel, 12 * scale, 0.74));
         }
 
-        labels.Children.Add(CreateLabel(key.PrimaryLabel, key.Role == KeyRole.Character ? 17 : 13, 1.0));
+        labels.Children.Add(CreateLabel(key.PrimaryLabel, (key.Role == KeyRole.Character ? 17 : 13) * scale, 1.0));
 
         if (ShowFingerLabels)
         {
-            labels.Children.Add(CreateLabel(GetFingerLabel(key.Finger), 9, 0.68));
+            labels.Children.Add(CreateLabel(GetFingerLabel(key.Finger), 9 * scale, 0.68));
         }
 
         return new Border
         {
-            MinHeight = 58,
-            Padding = new Thickness(4, 4, 4, 4),
+            MinHeight = 58 * scale,
+            Padding = new Thickness(4 * scale, 4 * scale, 4 * scale, 4 * scale),
             CornerRadius = new CornerRadius(1),
             Child = labels
         };
@@ -199,6 +215,7 @@ public sealed partial class VisualKeyboardControl : UserControl
 
     private void UpdateKeyStyles()
     {
+        var scale = GetScale();
         foreach (var (keyId, border) in _keyBorders)
         {
             var key = _keys[keyId];
@@ -216,9 +233,9 @@ public sealed partial class VisualKeyboardControl : UserControl
                     ? ShiftHighlightBorderBrush
                     : NeutralBorderBrush;
             border.BorderThickness = isCurrent
-                ? new Thickness(3)
+                ? new Thickness(3 * scale)
                 : isShift
-                    ? new Thickness(2)
+                    ? new Thickness(2 * scale)
                     : new Thickness(1);
             border.Opacity = isCurrent || isShift ? 1.0 : 0.76;
             SetTextBrush(border, isCurrent || isShift ? HighlightTextBrush : NormalTextBrush);
@@ -283,5 +300,10 @@ public sealed partial class VisualKeyboardControl : UserControl
     private static SolidColorBrush Brush(byte red, byte green, byte blue)
     {
         return new SolidColorBrush(Color.FromArgb(255, red, green, blue));
+    }
+
+    private double GetScale()
+    {
+        return Math.Clamp(KeyboardScale, 0.58, 1.0);
     }
 }

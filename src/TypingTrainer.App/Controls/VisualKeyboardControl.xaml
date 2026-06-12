@@ -6,7 +6,6 @@
     IsTabStop="False">
     <Border
         x:Name="KeyboardFrame"
-        MinWidth="760"
         MaxWidth="1280"
         Padding="12"
         HorizontalAlignment="Stretch"

@@ -128,11 +128,20 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public string RawWpmText => CurrentState.RawWpm.ToString("0", CultureInfo.InvariantCulture);
 
+    public string NetWpmText => FormatWpm(CalculateLiveNetWpm(CurrentState));
+
     public string AccuracyText => (CurrentState.Accuracy * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
     public string ElapsedText => TimeSpan.FromMilliseconds(CurrentState.ElapsedMs).ToString(@"m\:ss", CultureInfo.InvariantCulture);
 
     public string ErrorsText => CurrentState.CurrentErrors.ToString(CultureInfo.InvariantCulture);
+
+    public string ProgressText => CurrentState.TargetText.Length == 0
+        ? "0%"
+        : (Math.Min(CurrentState.CursorIndex, CurrentState.TargetText.Length) / (double)CurrentState.TargetText.Length)
+            .ToString("P0", CultureInfo.InvariantCulture);
+
+    public string CharactersText => $"{Math.Min(CurrentState.CursorIndex, CurrentState.TargetText.Length)} / {CurrentState.TargetText.Length}";
 
     public bool IsComplete => CurrentState.IsComplete;
 
@@ -445,9 +454,12 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     {
         OnPropertyChanged(nameof(CurrentState));
         OnPropertyChanged(nameof(RawWpmText));
+        OnPropertyChanged(nameof(NetWpmText));
         OnPropertyChanged(nameof(AccuracyText));
         OnPropertyChanged(nameof(ElapsedText));
         OnPropertyChanged(nameof(ErrorsText));
+        OnPropertyChanged(nameof(ProgressText));
+        OnPropertyChanged(nameof(CharactersText));
         OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(IsInputEnabled));
         OnPropertyChanged(nameof(CompletionStatus));
@@ -513,6 +525,18 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
         var elapsedMinutes = summary.DurationMs / 60_000.0;
         var netWpm = ((summary.CorrectCharacterKeypresses - summary.CurrentErrors) / 5.0) / elapsedMinutes;
+        return Math.Max(0, netWpm);
+    }
+
+    private static double CalculateLiveNetWpm(TypingStateSnapshot snapshot)
+    {
+        if (snapshot.ElapsedMs <= 0 || snapshot.TypedCharacterKeypresses <= 0)
+        {
+            return 0;
+        }
+
+        var elapsedMinutes = snapshot.ElapsedMs / 60_000.0;
+        var netWpm = ((snapshot.CorrectCharacterKeypresses - snapshot.CurrentErrors) / 5.0) / elapsedMinutes;
         return Math.Max(0, netWpm);
     }
 

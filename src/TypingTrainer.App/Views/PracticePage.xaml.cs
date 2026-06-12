@@ -51,6 +51,7 @@ public sealed partial class PracticePage : Page
             _isLoaded = true;
         }
 
+        ApplyResponsiveLayout(ActualWidth, ActualHeight);
         InputSurface.Focus(FocusState.Programmatic);
         QueueScrollToCursor();
     }
@@ -181,11 +182,239 @@ public sealed partial class PracticePage : Page
         QueueScrollToCursor();
     }
 
+    private void PracticeRoot_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ApplyResponsiveLayout(e.NewSize.Width, e.NewSize.Height);
+    }
+
     private void PracticeRoot_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         if (!IsInteractiveElement(e.OriginalSource as DependencyObject))
         {
             InputSurface.Focus(FocusState.Pointer);
+        }
+    }
+
+    private void ApplyResponsiveLayout(double width, double height)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        var widthScale = width switch
+        {
+            < 720 => 0.70,
+            < 920 => 0.78,
+            < 1200 => 0.88,
+            _ => 1.00
+        };
+        var heightScale = height switch
+        {
+            < 700 => 0.64,
+            < 820 => 0.74,
+            < 980 => 0.86,
+            _ => 1.00
+        };
+        var scale = Math.Clamp(Math.Min(widthScale, heightScale), 0.68, 1.0);
+        var keyboardScale = Math.Clamp(scale * (height < 900 ? 0.94 : 1.0), 0.58, 1.0);
+        var compactHeader = width < 980;
+        var veryCompactHeader = width < 720;
+        var stackedSelectors = width < 760;
+
+        var pageHorizontalPadding = Math.Clamp(32 * scale, 16, 32);
+        var pageTopPadding = Math.Clamp(24 * scale, 12, 28);
+        var pageBottomPadding = Math.Clamp(18 * scale, 8, 24);
+        PracticeRoot.Padding = new Thickness(
+            pageHorizontalPadding,
+            pageTopPadding,
+            pageHorizontalPadding,
+            pageBottomPadding);
+        PracticeRoot.RowSpacing = Math.Clamp(18 * scale, 10, 20);
+
+        HeaderGrid.RowSpacing = Math.Clamp(10 * scale, 7, 12);
+        HeaderTopGrid.ColumnSpacing = Math.Clamp(16 * scale, 10, 16);
+        HeaderTopGrid.RowSpacing = Math.Clamp(8 * scale, 6, 8);
+        NavigationPanel.Spacing = Math.Clamp(8 * scale, 5, 8);
+        LessonSelectorsPanel.Orientation = stackedSelectors ? Orientation.Vertical : Orientation.Horizontal;
+        LessonSelectorsPanel.Spacing = stackedSelectors ? Math.Clamp(7 * scale, 5, 8) : Math.Clamp(14 * scale, 9, 14);
+
+        ArrangeHeaderTop(compactHeader, veryCompactHeader);
+        ArrangeContext(compactHeader, veryCompactHeader);
+        ArrangeKpis(compactHeader, scale);
+        SetHeaderTypography(scale);
+        SetKpiTileSizing(scale);
+
+        InputBorder.Padding = new Thickness(Math.Clamp(32 * scale, 16, 32));
+        InputBorder.MaxWidth = width < 1200 ? double.PositiveInfinity : 1100;
+        PracticeTextPresenter.DisplayScale = scale;
+        VisualKeyboard.KeyboardScale = keyboardScale;
+        VisualKeyboard.MaxWidth = width < 900 ? double.PositiveInfinity : 1280;
+
+        var headerHeight = HeaderGrid.ActualHeight > 0
+            ? HeaderGrid.ActualHeight
+            : compactHeader ? 245 * scale : 178 * scale;
+        var keyboardHeightEstimate = (306 * keyboardScale) + 18;
+        var statusAllowance = 62 * scale;
+        var availableTextHeight = height
+            - PracticeRoot.Padding.Top
+            - PracticeRoot.Padding.Bottom
+            - PracticeRoot.RowSpacing
+            - headerHeight
+            - keyboardHeightEstimate
+            - statusAllowance;
+        var maxTextHeight = Math.Clamp(availableTextHeight, 120, height < 900 ? 300 : 360);
+        PracticeTextScrollViewer.MaxHeight = maxTextHeight;
+        PracticeTextScrollViewer.MinHeight = Math.Min(maxTextHeight, Math.Clamp(190 * scale, 120, 190));
+    }
+
+    private void ArrangeHeaderTop(bool compactHeader, bool veryCompactHeader)
+    {
+        if (veryCompactHeader)
+        {
+            HeaderSpacerColumn.Width = new GridLength(0);
+            HeaderControlsColumn.Width = new GridLength(1, GridUnitType.Star);
+
+            Grid.SetRow(TitlePanel, 0);
+            Grid.SetColumn(TitlePanel, 0);
+            Grid.SetColumnSpan(TitlePanel, 4);
+            Grid.SetRow(NavigationPanel, 1);
+            Grid.SetColumn(NavigationPanel, 0);
+            Grid.SetColumnSpan(NavigationPanel, 4);
+            Grid.SetRow(LessonSelectorsPanel, 2);
+            Grid.SetColumn(LessonSelectorsPanel, 0);
+            Grid.SetColumnSpan(LessonSelectorsPanel, 4);
+            LessonSelectorsPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
+            return;
+        }
+
+        if (compactHeader)
+        {
+            HeaderSpacerColumn.Width = new GridLength(1, GridUnitType.Star);
+            HeaderControlsColumn.Width = GridLength.Auto;
+
+            Grid.SetRow(TitlePanel, 0);
+            Grid.SetColumn(TitlePanel, 0);
+            Grid.SetColumnSpan(TitlePanel, 4);
+            Grid.SetRow(NavigationPanel, 1);
+            Grid.SetColumn(NavigationPanel, 0);
+            Grid.SetColumnSpan(NavigationPanel, 2);
+            Grid.SetRow(LessonSelectorsPanel, 1);
+            Grid.SetColumn(LessonSelectorsPanel, 3);
+            Grid.SetColumnSpan(LessonSelectorsPanel, 1);
+            LessonSelectorsPanel.HorizontalAlignment = HorizontalAlignment.Right;
+            return;
+        }
+
+        HeaderSpacerColumn.Width = new GridLength(1, GridUnitType.Star);
+        HeaderControlsColumn.Width = GridLength.Auto;
+
+        Grid.SetRow(TitlePanel, 0);
+        Grid.SetColumn(TitlePanel, 0);
+        Grid.SetColumnSpan(TitlePanel, 1);
+        Grid.SetRow(NavigationPanel, 0);
+        Grid.SetColumn(NavigationPanel, 1);
+        Grid.SetColumnSpan(NavigationPanel, 1);
+        Grid.SetRow(LessonSelectorsPanel, 0);
+        Grid.SetColumn(LessonSelectorsPanel, 3);
+        Grid.SetColumnSpan(LessonSelectorsPanel, 1);
+        LessonSelectorsPanel.HorizontalAlignment = HorizontalAlignment.Right;
+    }
+
+    private void ArrangeContext(bool compactHeader, bool veryCompactHeader)
+    {
+        if (veryCompactHeader)
+        {
+            ContextColumn0.Width = new GridLength(1, GridUnitType.Star);
+            ContextColumn1.Width = new GridLength(0);
+            ContextColumn2.Width = new GridLength(0);
+            ContextColumn3.Width = new GridLength(0);
+            MoveContextText(LessonReasonText, 0, 0, 1);
+            MoveContextText(FocusKeysText, 1, 0, 1);
+            MoveContextText(FocusBigramsText, 2, 0, 1);
+            MoveContextText(LessonContentText, 3, 0, 1);
+            return;
+        }
+
+        if (compactHeader)
+        {
+            ContextColumn0.Width = new GridLength(1, GridUnitType.Star);
+            ContextColumn1.Width = new GridLength(1, GridUnitType.Star);
+            ContextColumn2.Width = new GridLength(0);
+            ContextColumn3.Width = new GridLength(0);
+            MoveContextText(LessonReasonText, 0, 0, 1);
+            MoveContextText(FocusKeysText, 0, 1, 1);
+            MoveContextText(FocusBigramsText, 1, 0, 1);
+            MoveContextText(LessonContentText, 1, 1, 1);
+            return;
+        }
+
+        ContextColumn0.Width = new GridLength(1.1, GridUnitType.Star);
+        ContextColumn1.Width = new GridLength(1, GridUnitType.Star);
+        ContextColumn2.Width = new GridLength(1, GridUnitType.Star);
+        ContextColumn3.Width = new GridLength(1.4, GridUnitType.Star);
+        MoveContextText(LessonReasonText, 0, 0, 1);
+        MoveContextText(FocusKeysText, 0, 1, 1);
+        MoveContextText(FocusBigramsText, 0, 2, 1);
+        MoveContextText(LessonContentText, 0, 3, 1);
+    }
+
+    private static void MoveContextText(FrameworkElement element, int row, int column, int columnSpan)
+    {
+        Grid.SetRow(element, row);
+        Grid.SetColumn(element, column);
+        Grid.SetColumnSpan(element, columnSpan);
+    }
+
+    private void ArrangeKpis(bool compactHeader, double scale)
+    {
+        var columns = compactHeader ? 3 : 6;
+        var columnDefinitions = new[] { KpiColumn0, KpiColumn1, KpiColumn2, KpiColumn3, KpiColumn4, KpiColumn5 };
+        for (var index = 0; index < columnDefinitions.Length; index++)
+        {
+            columnDefinitions[index].Width = index < columns
+                ? new GridLength(1, GridUnitType.Star)
+                : new GridLength(0);
+        }
+
+        KpiRow1.Height = compactHeader ? GridLength.Auto : new GridLength(0);
+        StatsGrid.ColumnSpacing = Math.Clamp(8 * scale, 5, 8);
+        StatsGrid.RowSpacing = compactHeader ? Math.Clamp(8 * scale, 5, 8) : 0;
+
+        var tiles = new[] { RawWpmTile, NetWpmTile, AccuracyTile, ElapsedTile, ErrorsTile, ProgressTile };
+        for (var index = 0; index < tiles.Length; index++)
+        {
+            Grid.SetRow(tiles[index], compactHeader ? index / 3 : 0);
+            Grid.SetColumn(tiles[index], compactHeader ? index % 3 : index);
+        }
+    }
+
+    private void SetHeaderTypography(double scale)
+    {
+        TitleText.FontSize = Math.Clamp(28 * scale, 22, 28);
+        LessonTitleText.FontSize = Math.Clamp(14 * scale, 12, 14);
+        LessonReasonText.FontSize = Math.Clamp(14 * scale, 12, 14);
+        FocusKeysText.FontSize = Math.Clamp(14 * scale, 12, 14);
+        FocusBigramsText.FontSize = Math.Clamp(14 * scale, 12, 14);
+        LessonContentText.FontSize = Math.Clamp(14 * scale, 12, 14);
+
+        foreach (var valueText in new[] { RawWpmValueText, NetWpmValueText, AccuracyValueText, ElapsedValueText, ErrorsValueText, ProgressValueText })
+        {
+            valueText.FontSize = Math.Clamp(24 * scale, 18, 24);
+        }
+
+        foreach (var labelText in new[] { RawWpmLabelText, NetWpmLabelText, AccuracyLabelText, ElapsedLabelText, ErrorsLabelText, ProgressLabelText, CharactersText })
+        {
+            labelText.FontSize = Math.Clamp(11 * scale, 9, 11);
+        }
+    }
+
+    private void SetKpiTileSizing(double scale)
+    {
+        foreach (var tile in new[] { RawWpmTile, NetWpmTile, AccuracyTile, ElapsedTile, ErrorsTile, ProgressTile })
+        {
+            tile.Padding = new Thickness(Math.Clamp(12 * scale, 8, 12), Math.Clamp(10 * scale, 7, 10), Math.Clamp(12 * scale, 8, 12), Math.Clamp(10 * scale, 7, 10));
+            tile.MinHeight = Math.Clamp(68 * scale, 54, 68);
         }
     }
 
