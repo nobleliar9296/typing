@@ -1,4 +1,5 @@
 using TypingTrainer.Core.Coaching;
+using TypingTrainer.Core.Content;
 using TypingTrainer.Core.Keyboard;
 using TypingTrainer.Core.Lessons;
 using TypingTrainer.Core.Review;
@@ -65,6 +66,13 @@ public sealed class LessonService : ILessonService
                 ? Math.Max(20, target)
                 : Math.Max(20, settings.LessonLengthCharacters);
 
+            if (mode == LessonMode.Clipboard)
+            {
+                return _adaptiveLessonGenerator.Generate(
+                    skillProfile,
+                    CreateOptions(LessonMode.Adaptive, settings, targetCharacters));
+            }
+
             if (mode == LessonMode.Paragraph)
             {
                 var paragraphs = await _contentQueryService.GetParagraphsAsync(
@@ -103,6 +111,37 @@ public sealed class LessonService : ILessonService
         }
     }
 
+    public async Task<LessonGenerationResult> GenerateClipboardLessonAsync(
+        string clipboardText,
+        int? targetCharactersOverride = null,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await _appSettingsRepository.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
+        var targetCharacters = targetCharactersOverride is int target
+            ? Math.Max(20, target)
+            : Math.Max(20, settings.LessonLengthCharacters);
+        var normalized = NormalizePracticeText(
+            clipboardText,
+            settings.NormalizeImportedTextToAscii,
+            settings.NormalizeImportedWhitespace,
+            settings.LowercaseImportedText);
+        var text = TrimToTargetLength(normalized, targetCharacters);
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            text = FixedLessonGenerator.FixedLessonText;
+        }
+
+        return new LessonGenerationResult(
+            text,
+            text.Where(character => !char.IsWhiteSpace(character)).ToHashSet(),
+            Array.Empty<char>(),
+            Array.Empty<string>(),
+            "Clipboard practice",
+            "Clipboard",
+            "One-off local text");
+    }
+
     public async Task<LessonGenerationResult> GenerateReviewLessonAsync(
         SessionReview review,
         int targetCharacters,
@@ -128,7 +167,9 @@ public sealed class LessonService : ILessonService
                     seed,
                     settings.AllowCapitalLetters,
                     settings.AllowNumbers,
-                    settings.AllowPunctuation));
+                    settings.AllowPunctuation,
+                    settings.GoalTrainingFocus,
+                    settings.DifficultyPreset));
 
             return lesson with
             {
@@ -178,7 +219,26 @@ public sealed class LessonService : ILessonService
             RandomSeed: null,
             settings.AllowCapitalLetters,
             settings.AllowNumbers,
-            settings.AllowPunctuation);
+            settings.AllowPunctuation,
+            settings.GoalTrainingFocus,
+            settings.DifficultyPreset);
+    }
+
+    private static string NormalizePracticeText(
+        string text,
+        bool normalizeToAscii,
+        bool normalizeWhitespace,
+        bool lowercase)
+    {
+        var normalized = normalizeToAscii ? AsciiTextNormalizer.ToAscii(text) : text;
+        if (lowercase)
+        {
+            normalized = normalized.ToLowerInvariant();
+        }
+
+        return normalizeWhitespace
+            ? string.Join(' ', normalized.Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            : normalized.Trim();
     }
 
     private static string TrimToTargetLength(string text, int targetCharacters)

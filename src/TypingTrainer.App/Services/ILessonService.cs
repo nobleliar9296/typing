@@ -16,6 +16,11 @@ public interface ILessonService
         int? targetCharactersOverride = null,
         CancellationToken cancellationToken = default);
 
+    Task<LessonGenerationResult> GenerateClipboardLessonAsync(
+        string clipboardText,
+        int? targetCharactersOverride = null,
+        CancellationToken cancellationToken = default);
+
     Task<LessonGenerationResult> GenerateReviewLessonAsync(
         SessionReview review,
         int targetCharacters,

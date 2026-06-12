@@ -68,6 +68,8 @@ public sealed partial class TrendLineChart : UserControl
         InitializeComponent();
     }
 
+    public event EventHandler<ChartPointSelectedEventArgs>? PointSelected;
+
     public IReadOnlyList<ChartPointViewModel>? Points
     {
         get => (IReadOnlyList<ChartPointViewModel>?)GetValue(PointsProperty);
@@ -152,6 +154,23 @@ public sealed partial class TrendLineChart : UserControl
         ClearHover();
     }
 
+    private void ChartCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (_renderedPoints.Length == 0)
+        {
+            return;
+        }
+
+        var pointerPosition = e.GetCurrentPoint(ChartCanvas).Position;
+        var nearest = _renderedPoints
+            .OrderBy(point => Math.Abs(point.Location.X - pointerPosition.X))
+            .First();
+        ShowHover(nearest);
+        PointSelected?.Invoke(
+            this,
+            new ChartPointSelectedEventArgs(nearest.Index, nearest.Point.Label, nearest.Point.Value));
+    }
+
     private void Render()
     {
         ChartCanvas.Children.Clear();
@@ -184,7 +203,7 @@ public sealed partial class TrendLineChart : UserControl
             var y = PlotTop + plotHeight - (points[index].Value / maximum * plotHeight);
             var location = new Point(x, y);
             pointCollection.Add(location);
-            renderedPoints[index] = new RenderedPoint(location, points[index]);
+            renderedPoints[index] = new RenderedPoint(index, location, points[index]);
         }
 
         _renderedPoints = renderedPoints;
@@ -415,5 +434,21 @@ public sealed partial class TrendLineChart : UserControl
         return new SolidColorBrush(Color.FromArgb(255, red, green, blue));
     }
 
-    private readonly record struct RenderedPoint(Point Location, ChartPointViewModel Point);
+    private readonly record struct RenderedPoint(int Index, Point Location, ChartPointViewModel Point);
+}
+
+public sealed class ChartPointSelectedEventArgs : EventArgs
+{
+    public ChartPointSelectedEventArgs(int index, string label, double value)
+    {
+        Index = index;
+        Label = label;
+        Value = value;
+    }
+
+    public int Index { get; }
+
+    public string Label { get; }
+
+    public double Value { get; }
 }

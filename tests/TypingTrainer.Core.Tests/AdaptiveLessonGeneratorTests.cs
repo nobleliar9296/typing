@@ -68,6 +68,33 @@ public sealed class AdaptiveLessonGeneratorTests
     }
 
     [TestMethod]
+    public void AdaptiveLessonGenerator_WeakLeftHandFocus_SelectsLeftHandWeakCharacters()
+    {
+        var profile = CreateHandFocusProfile();
+
+        var result = CreateGenerator().Generate(
+            profile,
+            Options(LessonMode.Adaptive, randomSeed: 11, trainingFocus: "WeakLeftHand"));
+
+        Assert.IsTrue(result.FocusCharacters.Contains('q'));
+        Assert.IsFalse(result.FocusCharacters.Contains('p'));
+    }
+
+    [TestMethod]
+    public void AdaptiveLessonGenerator_FocusWithSameSeed_IsDeterministic()
+    {
+        var generator = CreateGenerator();
+        var profile = CreateHandFocusProfile();
+        var options = Options(LessonMode.Adaptive, randomSeed: 22, trainingFocus: "SpeedFirst");
+
+        var first = generator.Generate(profile, options);
+        var second = generator.Generate(profile, options);
+
+        Assert.AreEqual(first.Text, second.Text);
+        CollectionAssert.AreEqual(first.FocusCharacters.ToArray(), second.FocusCharacters.ToArray());
+    }
+
+    [TestMethod]
     public void AdaptiveLessonGenerator_FixedMode_ReturnsFixedLesson()
     {
         var result = CreateGenerator().Generate(
@@ -108,14 +135,18 @@ public sealed class AdaptiveLessonGeneratorTests
         return new AdaptiveLessonGenerator(new BuiltInWordListProvider(), new CharacterUnlockPlanner());
     }
 
-    private static LessonGenerationOptions Options(LessonMode mode, int? randomSeed = null)
+    private static LessonGenerationOptions Options(
+        LessonMode mode,
+        int? randomSeed = null,
+        string trainingFocus = "Balanced")
     {
         return new LessonGenerationOptions(
             mode,
             LessonLengthKind.Characters,
             120,
             KeyboardLayoutRepository.Qwerty,
-            randomSeed);
+            randomSeed,
+            TrainingFocus: trainingFocus);
     }
 
     private static UserSkillProfile CreateWeakCharacterProfile(char weakCharacter)
@@ -186,6 +217,37 @@ public sealed class AdaptiveLessonGeneratorTests
             new Dictionary<string, BigramSkill>(),
             CompletedSessionCount: 5,
             TotalPracticeTime: TimeSpan.FromMinutes(20),
+            CreatedAtUtc: new DateTime(2026, 6, 11));
+    }
+
+    private static UserSkillProfile CreateHandFocusProfile()
+    {
+        var characters = "abcdefghijklmnopqrstuvwxyz".ToDictionary(
+            character => character,
+            character =>
+            {
+                var isLeftTarget = character == 'q';
+                var isRightTarget = character == 'p';
+                var isTarget = isLeftTarget || isRightTarget;
+                var accuracy = isTarget ? 0.35 : 0.98;
+
+                return new CharacterSkill(
+                    character,
+                    ExposureCount: 80,
+                    CorrectCount: isTarget ? 28 : 78,
+                    IncorrectCount: isTarget ? 52 : 2,
+                    Accuracy: accuracy,
+                    MedianLatencyMs: isTarget ? 480 : 120,
+                    AverageLatencyMs: isTarget ? 500 : 125,
+                    WeaknessScore: isTarget ? 1.0 : 0.01,
+                    ConfidenceScore: CharacterUnlockPlanner.CalculateConfidence(80, accuracy, isTarget ? 480 : 120));
+            });
+
+        return new UserSkillProfile(
+            characters,
+            new Dictionary<string, BigramSkill>(),
+            CompletedSessionCount: 8,
+            TotalPracticeTime: TimeSpan.FromMinutes(35),
             CreatedAtUtc: new DateTime(2026, 6, 11));
     }
 

@@ -7,6 +7,7 @@
             x:Name="ChartCanvas"
             Background="Transparent"
             PointerExited="ChartCanvas_PointerExited"
+            PointerPressed="ChartCanvas_PointerPressed"
             PointerMoved="ChartCanvas_PointerMoved"
             SizeChanged="ChartCanvas_SizeChanged" />
         <Canvas

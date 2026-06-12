@@ -251,6 +251,10 @@ public sealed class ContentServicesTests
         Assert.AreEqual(220, settings.LessonLengthCharacters);
         Assert.IsTrue(settings.UseImportedContent);
         Assert.IsFalse(settings.RequireCorrectKeyToAdvance);
+        Assert.IsFalse(settings.ZenModeEnabled);
+        Assert.AreEqual(0, settings.CountdownSeconds);
+        Assert.IsFalse(settings.KeySoundEnabled);
+        Assert.IsFalse(settings.MistakeSoundEnabled);
         Assert.IsTrue(settings.ShowVisualKeyboard);
         Assert.IsTrue(settings.ShowFingerColors);
         Assert.IsFalse(settings.ShowFingerLabels);
@@ -267,6 +271,8 @@ public sealed class ContentServicesTests
         Assert.AreEqual(15, settings.GoalTargetSessionMinutes);
         Assert.AreEqual(1000, settings.GoalTargetEssayWords);
         Assert.AreEqual(AppSettings.DefaultFontFamily, settings.PracticeFontFamily);
+        Assert.AreEqual(AppSettings.DefaultThemePreset, settings.ThemePreset);
+        Assert.AreEqual(AppSettings.DefaultDifficultyPreset, settings.DifficultyPreset);
     }
 
     [TestMethod]
@@ -278,7 +284,13 @@ public sealed class ContentServicesTests
             DefaultLessonMode = "Paragraph",
             LessonLengthCharacters = 333,
             AllowNumbers = true,
-            AutoSaveCompletedSessions = false
+            AutoSaveCompletedSessions = false,
+            ZenModeEnabled = true,
+            CountdownSeconds = 3,
+            KeySoundEnabled = true,
+            MistakeSoundEnabled = true,
+            ThemePreset = "Dark",
+            DifficultyPreset = "Speed Words"
         };
 
         await database.SettingsRepository.SaveSettingsAsync(settings);
@@ -288,6 +300,12 @@ public sealed class ContentServicesTests
         Assert.AreEqual(333, stored.LessonLengthCharacters);
         Assert.IsTrue(stored.AllowNumbers);
         Assert.IsFalse(stored.AutoSaveCompletedSessions);
+        Assert.IsTrue(stored.ZenModeEnabled);
+        Assert.AreEqual(3, stored.CountdownSeconds);
+        Assert.IsTrue(stored.KeySoundEnabled);
+        Assert.IsTrue(stored.MistakeSoundEnabled);
+        Assert.AreEqual("Dark", stored.ThemePreset);
+        Assert.AreEqual("Speed Words", stored.DifficultyPreset);
     }
 
     [TestMethod]
@@ -394,6 +412,17 @@ public sealed class ContentServicesTests
 
         Assert.AreEqual(70, settings.PracticeTextScalePercent);
         Assert.AreEqual(130, settings.VisualKeyboardScalePercent);
+    }
+
+    [TestMethod]
+    public async Task AppSettingsRepository_CountdownSeconds_ClampStoredValues()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        await database.SetRawSettingAsync("typing.countdownSeconds", "99");
+
+        var settings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual(3, settings.CountdownSeconds);
     }
 
     [TestMethod]

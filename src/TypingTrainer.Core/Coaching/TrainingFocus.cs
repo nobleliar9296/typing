@@ -5,7 +5,11 @@ public enum TrainingFocus
     Balanced,
     Accuracy,
     Speed,
+    AccuracyFirst,
+    SpeedFirst,
+    WeakLeftHand,
+    WeakRightHand,
+    Punctuation,
     EssayEndurance,
     ExamPractice
 }
-

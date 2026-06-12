@@ -21,9 +21,17 @@ public sealed class TypingCoach
             return Plan(focus, "Build a baseline with a few short saved sessions.", steps);
         }
 
-        if (focus == TrainingFocus.Accuracy || stats.Accuracy < accuracyTarget)
+        if (focus is TrainingFocus.Accuracy or TrainingFocus.AccuracyFirst or TrainingFocus.WeakLeftHand or TrainingFocus.WeakRightHand or TrainingFocus.Punctuation
+            || stats.Accuracy < accuracyTarget)
         {
-            steps.Add(Step(1, "Accuracy control", FormatTarget("Run Weak Keys", stats.WeakestKey), LessonMode.WeakKeys, 220, safeMinutes / 2));
+            var title = focus switch
+            {
+                TrainingFocus.WeakLeftHand => "Left-hand control",
+                TrainingFocus.WeakRightHand => "Right-hand control",
+                TrainingFocus.Punctuation => "Punctuation control",
+                _ => "Accuracy control"
+            };
+            steps.Add(Step(1, title, FormatTarget("Run Weak Keys", stats.WeakestKey), LessonMode.WeakKeys, 220, safeMinutes / 2));
             steps.Add(Step(2, "Confirm in context", "Finish with one short paragraph while keeping accuracy clean.", LessonMode.Paragraph, 220, safeMinutes - steps[0].Minutes));
             return Plan(focus, "Prioritize accuracy before pushing speed.", steps);
         }
@@ -42,7 +50,7 @@ public sealed class TypingCoach
             return Plan(focus, "Simulate a focused timed typing block.", steps);
         }
 
-        if (focus == TrainingFocus.Speed || stats.AverageNetWpm < stats.GoalTargetNetWpm)
+        if (focus is TrainingFocus.Speed or TrainingFocus.SpeedFirst || stats.AverageNetWpm < stats.GoalTargetNetWpm)
         {
             steps.Add(Step(1, "Flow practice", "Use Paragraph mode to keep words moving.", LessonMode.Paragraph, 1250, safeMinutes / 2));
             steps.Add(Step(2, "Smooth transitions", FormatTarget("Use Weak Bigrams", stats.SlowestBigram), LessonMode.WeakBigrams, 220, safeMinutes - steps[0].Minutes));
@@ -82,4 +90,3 @@ public sealed class TypingCoach
         return string.IsNullOrWhiteSpace(target) ? $"{prefix} for the weakest current targets." : $"{prefix}, starting with {target}.";
     }
 }
-

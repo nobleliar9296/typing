@@ -1,7 +1,6 @@
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using TypingTrainer.App.Views;
 
 namespace TypingTrainer.App.Controls;
@@ -19,6 +18,8 @@ public sealed partial class AppTopBar : UserControl
         InitializeComponent();
         UpdateActivePage();
     }
+
+    public event Action<Type>? NavigateRequested;
 
     public string ActivePage
     {
@@ -51,32 +52,7 @@ public sealed partial class AppTopBar : UserControl
 
     private void Navigate(Type pageType)
     {
-        var frame = FindParentFrame();
-        if (frame?.CurrentSourcePageType != pageType)
-        {
-            frame?.Navigate(pageType);
-        }
-    }
-
-    private Frame? FindParentFrame()
-    {
-        DependencyObject? current = this;
-        while (current is not null)
-        {
-            if (current is Frame frame)
-            {
-                return frame;
-            }
-
-            if (current is Page page)
-            {
-                return page.Frame;
-            }
-
-            current = VisualTreeHelper.GetParent(current);
-        }
-
-        return null;
+        NavigateRequested?.Invoke(pageType);
     }
 
     private void UpdateActivePage()

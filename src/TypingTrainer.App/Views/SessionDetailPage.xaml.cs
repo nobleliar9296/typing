@@ -28,11 +28,17 @@ public sealed partial class SessionDetailPage : Page
 
     private void BackButton_Click(object sender, RoutedEventArgs e)
     {
-        Frame.Navigate(typeof(DashboardPage));
+        NavigateTo(typeof(DashboardPage));
     }
 
     private void ReplayMistakesButton_Click(object sender, RoutedEventArgs e)
     {
-        Frame.Navigate(typeof(PracticePage));
+        NavigateTo(typeof(PracticePage));
+    }
+
+    private bool NavigateTo(Type pageType, object? parameter = null)
+    {
+        return MainWindow.Instance?.NavigateTo(pageType, parameter)
+            ?? Frame.Navigate(pageType, parameter);
     }
 }

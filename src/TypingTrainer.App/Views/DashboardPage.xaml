@@ -9,15 +9,13 @@
     <Grid RowSpacing="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <controls:AppTopBar ActivePage="Dashboard" />
-
-        <Grid Grid.Row="1" Margin="32,24,32,0" ColumnSpacing="24">
+        <Grid Grid.Row="0" Margin="32,24,32,0" ColumnSpacing="24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
@@ -48,6 +46,7 @@
                     <ComboBoxItem Content="Weak Keys" />
                     <ComboBoxItem Content="Weak Bigrams" />
                     <ComboBoxItem Content="Review" />
+                    <ComboBoxItem Content="Clipboard" />
                     <ComboBoxItem Content="Fixed" />
                 </ComboBox>
             </StackPanel>
@@ -67,9 +66,31 @@
                     <ComboBoxItem Content="All time" />
                 </ComboBox>
             </StackPanel>
+
+            <StackPanel Grid.Column="3" Spacing="8" VerticalAlignment="Center">
+                <TextBlock
+                    Text="Keys"
+                    HorizontalAlignment="Right"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <ComboBox
+                    x:Name="KeyFilterComboBox"
+                    Width="160"
+                    SelectedIndex="0"
+                    SelectionChanged="KeyFilterComboBox_SelectionChanged">
+                    <ComboBoxItem Content="All keys" />
+                    <ComboBoxItem Content="Left hand" />
+                    <ComboBoxItem Content="Right hand" />
+                    <ComboBoxItem Content="Home row" />
+                    <ComboBoxItem Content="Top row" />
+                    <ComboBoxItem Content="Bottom row" />
+                    <ComboBoxItem Content="Letters" />
+                    <ComboBoxItem Content="Punctuation" />
+                    <ComboBoxItem Content="Numbers" />
+                </ComboBox>
+            </StackPanel>
         </Grid>
 
-        <ScrollViewer Grid.Row="2" Margin="32,0,32,24">
+        <ScrollViewer Grid.Row="1" Margin="32,0,32,24">
             <StackPanel Spacing="24">
                 <ProgressRing
                     Width="32"
@@ -678,13 +699,15 @@
                                         <ColumnDefinition Width="90" />
                                         <ColumnDefinition Width="100" />
                                         <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="100" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Key" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Grid.Column="1" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Grid.Column="2" Text="Median ms" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Grid.Column="3" Text="Samples" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    <TextBlock Grid.Column="4" Text="Weakness" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="4" Text="Trend" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="5" Text="Weakness" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </Grid>
                             </ListView.Header>
                             <ListView.ItemTemplate>
@@ -692,21 +715,63 @@
                                     <Grid ColumnSpacing="10" Padding="0,7">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Key}" FontWeight="SemiBold" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Accuracy}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding MedianLatencyMs}" />
+                                            <TextBlock Grid.Column="3" Text="{Binding Samples}" />
+                                            <TextBlock Grid.Column="4" Text="{Binding Trend}" />
+                                            <ProgressBar Grid.Column="5" Maximum="100" Value="{Binding WeaknessPercent}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <ListView ItemsSource="{Binding HandFingerRows}" SelectionMode="None" MaxHeight="220">
+                                <ListView.Header>
+                                    <Grid ColumnSpacing="10" Padding="0,8,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="130" />
                                             <ColumnDefinition Width="90" />
                                             <ColumnDefinition Width="100" />
                                             <ColumnDefinition Width="90" />
+                                            <ColumnDefinition Width="100" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding Key}" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="1" Text="{Binding Accuracy}" />
-                                        <TextBlock Grid.Column="2" Text="{Binding MedianLatencyMs}" />
-                                        <TextBlock Grid.Column="3" Text="{Binding Samples}" />
-                                        <ProgressBar Grid.Column="4" Maximum="100" Value="{Binding WeaknessPercent}" />
+                                        <TextBlock Text="Hand / finger" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="2" Text="Median ms" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="3" Text="Samples" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="4" Text="Trend" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="5" Text="Weakness" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </StackPanel>
+                                </ListView.Header>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="10" Padding="0,7">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="130" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Group}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Accuracy}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding MedianLatencyMs}" />
+                                            <TextBlock Grid.Column="3" Text="{Binding Samples}" />
+                                            <TextBlock Grid.Column="4" Text="{Binding Trend}" />
+                                            <ProgressBar Grid.Column="5" Maximum="100" Value="{Binding WeaknessPercent}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
 
                     <Grid ColumnSpacing="24">
                         <Grid.ColumnDefinitions>

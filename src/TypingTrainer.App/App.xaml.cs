@@ -35,6 +35,7 @@ public partial class App : Application
             Services = await AppServices.CreateAsync();
             _window = new MainWindow();
             MainWindowInstance = _window;
+            AppThemeService.Apply((await Services.AppSettingsRepository.GetSettingsAsync()).ThemePreset);
             _window.Closed += Window_Closed;
             _window.Activate();
         }

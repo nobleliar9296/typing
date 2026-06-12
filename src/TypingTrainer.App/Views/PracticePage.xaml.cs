@@ -5,10 +5,15 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System.ComponentModel;
 using System.Diagnostics;
+using TypingTrainer.App.Controls;
 using TypingTrainer.App.ViewModels;
 using TypingTrainer.Core.Lessons;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 using Windows.System;
 using Windows.UI;
+using WinRT.Interop;
 
 namespace TypingTrainer.App.Views;
 
@@ -19,6 +24,7 @@ public sealed partial class PracticePage : Page
     private readonly DispatcherTimer _mistakeFeedbackTimer = new() { Interval = TimeSpan.FromMilliseconds(240) };
     private readonly SolidColorBrush _mistakeBorderBrush = new(Color.FromArgb(255, 196, 43, 55));
     private Brush? _defaultInputBorderBrush;
+    private double? _lastScrollTarget;
 
     public PracticePage()
     {
@@ -55,7 +61,8 @@ public sealed partial class PracticePage : Page
                 LessonMode.WeakKeys => 2,
                 LessonMode.WeakBigrams => 3,
                 LessonMode.Review => 4,
-                LessonMode.Fixed => 5,
+                LessonMode.Clipboard => 5,
+                LessonMode.Fixed => 6,
                 _ => 0
             };
             _isLoaded = true;
@@ -89,7 +96,7 @@ public sealed partial class PracticePage : Page
 
         if (!char.IsControl(character))
         {
-            ViewModel.HandleCharacter(character);
+            PlayInputSound(ViewModel.HandleCharacter(character));
             QueueScrollToCursor();
             args.Handled = true;
         }
@@ -111,7 +118,7 @@ public sealed partial class PracticePage : Page
         }
         else if (args.Key == VirtualKey.Back)
         {
-            ViewModel.HandleBackspace();
+            PlayInputSound(ViewModel.HandleBackspace());
             QueueScrollToCursor();
             args.Handled = true;
         }
@@ -145,6 +152,30 @@ public sealed partial class PracticePage : Page
         QueueScrollToCursor(animate: false);
     }
 
+    private async void ClipboardLessonButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dataPackageView = Clipboard.GetContent();
+            if (!dataPackageView.Contains(StandardDataFormats.Text))
+            {
+                return;
+            }
+
+            var text = await dataPackageView.GetTextAsync();
+            await ViewModel.StartClipboardLessonAsync(text);
+            _suppressLessonSelectionChanges = true;
+            LessonModeComboBox.SelectedIndex = 5;
+            _suppressLessonSelectionChanges = false;
+            FocusTypingSurface(FocusState.Programmatic);
+            QueueScrollToCursor(animate: false);
+        }
+        catch
+        {
+            // Clipboard access can be denied by Windows; leave the current lesson untouched.
+        }
+    }
+
     private async void PracticeMistakesButton_Click(object sender, RoutedEventArgs e)
     {
         await ViewModel.PracticeMistakesAsync();
@@ -166,7 +197,7 @@ public sealed partial class PracticePage : Page
             // Dashboard remains read-only and can still show the last successfully saved history.
         }
 
-        Frame.Navigate(typeof(DashboardPage));
+        NavigateTo(typeof(DashboardPage));
     }
 
     private async void LessonModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -182,13 +213,46 @@ public sealed partial class PracticePage : Page
             2 => LessonMode.WeakKeys,
             3 => LessonMode.WeakBigrams,
             4 => LessonMode.Review,
-            5 => LessonMode.Fixed,
+            5 => LessonMode.Clipboard,
+            6 => LessonMode.Fixed,
             _ => LessonMode.Adaptive
         };
 
         await ViewModel.ChangeLessonModeAsync(mode);
         FocusTypingSurface(FocusState.Programmatic);
         QueueScrollToCursor(animate: false);
+    }
+
+    private async void ExportSummaryButton_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileSavePicker
+        {
+            SuggestedFileName = $"typing-trainer-review-{DateTime.Now:yyyyMMdd-HHmm}",
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+        };
+        picker.FileTypeChoices.Add("Text review", [".txt"]);
+
+        if (App.MainWindowInstance is not null)
+        {
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindowInstance));
+        }
+
+        var file = await picker.PickSaveFileAsync();
+        if (file is null)
+        {
+            return;
+        }
+
+        await FileIO.WriteTextAsync(file, ViewModel.CreateReviewSummaryText());
+    }
+
+    private void SessionNetWpmChart_PointSelected(object sender, ChartPointSelectedEventArgs e)
+    {
+        if (ViewModel.StartRetryFromNetWpmPoint(e.Index))
+        {
+            FocusTypingSurface(FocusState.Programmatic);
+            QueueScrollToCursor(animate: false);
+        }
     }
 
     private async void LessonSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -290,7 +354,6 @@ public sealed partial class PracticePage : Page
         var keyboardHeightEstimate = (306 * keyboardScale) + 18;
         var statusAllowance = 34 * scale;
         var availableTextHeight = height
-            - 43
             - HeaderGrid.Margin.Top
             - PracticeRoot.RowSpacing
             - headerHeight
@@ -404,9 +467,34 @@ public sealed partial class PracticePage : Page
         }
     }
 
+    private bool NavigateTo(Type pageType, object? parameter = null)
+    {
+        return MainWindow.Instance?.NavigateTo(pageType, parameter)
+            ?? Frame.Navigate(pageType, parameter);
+    }
+
     private void FocusTypingSurface(FocusState focusState)
     {
         InputSurface.Focus(focusState);
+    }
+
+    private void PlayInputSound(PracticeInputFeedback feedback)
+    {
+        try
+        {
+            if (feedback == PracticeInputFeedback.Mistake && ViewModel.MistakeSoundEnabled)
+            {
+                ElementSoundPlayer.Play(ElementSoundKind.Focus);
+            }
+            else if (feedback == PracticeInputFeedback.Key && ViewModel.KeySoundEnabled)
+            {
+                ElementSoundPlayer.Play(ElementSoundKind.Invoke);
+            }
+        }
+        catch
+        {
+            // Sound feedback is optional; platform sound failures should never affect typing.
+        }
     }
 
     private void QueueScrollToCursor(bool animate = true)
@@ -419,13 +507,21 @@ public sealed partial class PracticePage : Page
                 cursorOffset - viewportAnchor,
                 0,
                 Math.Max(0, PracticeTextScrollViewer.ScrollableHeight));
+            var targetOffset = offset;
 
-            if (Math.Abs(PracticeTextScrollViewer.VerticalOffset - offset) < 0.5)
+            if (animate && _lastScrollTarget is double previousOffset)
+            {
+                targetOffset = previousOffset + ((offset - previousOffset) * 0.58);
+            }
+
+            _lastScrollTarget = targetOffset;
+
+            if (Math.Abs(PracticeTextScrollViewer.VerticalOffset - targetOffset) < 0.5)
             {
                 return;
             }
 
-            PracticeTextScrollViewer.ChangeView(null, offset, null, disableAnimation: !animate);
+            PracticeTextScrollViewer.ChangeView(null, targetOffset, null, disableAnimation: !animate);
         });
     }
 

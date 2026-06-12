@@ -66,11 +66,25 @@ public sealed partial class DashboardPage : Page
         await ViewModel.LoadAsync();
     }
 
+    private void KeyFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded)
+        {
+            return;
+        }
+
+        if (KeyFilterComboBox.SelectedItem is ComboBoxItem item
+            && item.Content is string content)
+        {
+            ViewModel.SelectedKeyFilter = content;
+        }
+    }
+
     private void RecentSessionsListView_ItemClick(object sender, ItemClickEventArgs e)
     {
         if (e.ClickedItem is RecentSessionDisplayRow row)
         {
-            Frame.Navigate(typeof(SessionDetailPage), row.SessionId);
+            NavigateTo(typeof(SessionDetailPage), row.SessionId);
         }
     }
 
@@ -78,12 +92,18 @@ public sealed partial class DashboardPage : Page
     {
         if (e.ClickedItem is PersonalBestDisplayRow { SessionId: Guid sessionId })
         {
-            Frame.Navigate(typeof(SessionDetailPage), sessionId);
+            NavigateTo(typeof(SessionDetailPage), sessionId);
         }
     }
 
     private void StartDailyPlanButton_Click(object sender, RoutedEventArgs e)
     {
-        Frame.Navigate(typeof(PracticePage));
+        NavigateTo(typeof(PracticePage));
+    }
+
+    private bool NavigateTo(Type pageType, object? parameter = null)
+    {
+        return MainWindow.Instance?.NavigateTo(pageType, parameter)
+            ?? Frame.Navigate(pageType, parameter);
     }
 }

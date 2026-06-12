@@ -7,13 +7,10 @@
 
     <Grid RowSpacing="24">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <controls:AppTopBar ActivePage="Dashboard" />
-
-        <ScrollViewer Grid.Row="1" Margin="32,24,32,24">
+        <ScrollViewer Grid.Row="0" Margin="32,24,32,24">
             <StackPanel Spacing="22">
                 <StackPanel Spacing="4">
                     <TextBlock Text="{Binding Title}" FontSize="28" FontWeight="SemiBold" />

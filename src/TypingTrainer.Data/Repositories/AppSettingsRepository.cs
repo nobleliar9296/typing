@@ -38,6 +38,10 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             GetBool(values, "BackspaceAllowed", defaults.BackspaceAllowed),
             GetBool(values, "AutoSaveCompletedSessions", defaults.AutoSaveCompletedSessions),
             GetBool(values, "typing.requireCorrectKeyToAdvance", defaults.RequireCorrectKeyToAdvance),
+            GetBool(values, "typing.zenMode", defaults.ZenModeEnabled),
+            GetClampedInt(values, "typing.countdownSeconds", defaults.CountdownSeconds, 0, 3),
+            GetBool(values, "typing.keySoundEnabled", defaults.KeySoundEnabled),
+            GetBool(values, "typing.mistakeSoundEnabled", defaults.MistakeSoundEnabled),
             GetBool(values, "visualKeyboard.showKeyboard", defaults.ShowVisualKeyboard),
             GetBool(values, "visualKeyboard.showFingerColors", defaults.ShowFingerColors),
             GetBool(values, "visualKeyboard.showFingerLabels", defaults.ShowFingerLabels),
@@ -56,7 +60,9 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             GetString(values, "practice.fontFamily", defaults.PracticeFontFamily),
             GetString(values, "practice.lineWidth", defaults.PracticeLineWidth),
             GetString(values, "practice.textContrast", defaults.PracticeTextContrast),
-            GetString(values, "practice.cursorStyle", defaults.PracticeCursorStyle));
+            GetString(values, "practice.cursorStyle", defaults.PracticeCursorStyle),
+            GetString(values, "practice.themePreset", defaults.ThemePreset),
+            GetString(values, "practice.difficultyPreset", defaults.DifficultyPreset));
     }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -74,6 +80,10 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         await UpsertAsync(connection, (SqliteTransaction)transaction, "BackspaceAllowed", Bool(settings.BackspaceAllowed), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "AutoSaveCompletedSessions", Bool(settings.AutoSaveCompletedSessions), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "typing.requireCorrectKeyToAdvance", Bool(settings.RequireCorrectKeyToAdvance), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "typing.zenMode", Bool(settings.ZenModeEnabled), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "typing.countdownSeconds", settings.CountdownSeconds.ToString(), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "typing.keySoundEnabled", Bool(settings.KeySoundEnabled), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "typing.mistakeSoundEnabled", Bool(settings.MistakeSoundEnabled), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.showKeyboard", Bool(settings.ShowVisualKeyboard), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.showFingerColors", Bool(settings.ShowFingerColors), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.showFingerLabels", Bool(settings.ShowFingerLabels), cancellationToken).ConfigureAwait(false);
@@ -93,6 +103,8 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.lineWidth", settings.PracticeLineWidth, cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.textContrast", settings.PracticeTextContrast, cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.cursorStyle", settings.PracticeCursorStyle, cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.themePreset", settings.ThemePreset, cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.difficultyPreset", settings.DifficultyPreset, cancellationToken).ConfigureAwait(false);
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }

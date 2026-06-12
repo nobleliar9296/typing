@@ -7,5 +7,6 @@ public enum LessonMode
     Paragraph,
     WeakKeys,
     WeakBigrams,
-    Review
+    Review,
+    Clipboard
 }

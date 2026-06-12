@@ -10,4 +10,6 @@ public sealed record LessonGenerationOptions(
     int? RandomSeed = null,
     bool AllowCapitalLetters = false,
     bool AllowNumbers = false,
-    bool AllowPunctuation = false);
+    bool AllowPunctuation = false,
+    string TrainingFocus = "Balanced",
+    string DifficultyPreset = "Custom");

@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using System.ComponentModel;
 using System.Globalization;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using TypingTrainer.Data.Content;
 using TypingTrainer.Data.Models;
@@ -119,6 +120,32 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         set => UpdateSettings(_settings with { RequireCorrectKeyToAdvance = value });
     }
 
+    public bool ZenModeEnabled
+    {
+        get => _settings.ZenModeEnabled;
+        set => UpdateSettings(_settings with { ZenModeEnabled = value });
+    }
+
+    public int CountdownSeconds
+    {
+        get => _settings.CountdownSeconds;
+        set => UpdateSettings(_settings with { CountdownSeconds = Math.Clamp(value, 0, 3) });
+    }
+
+    public string CountdownText => CountdownSeconds == 0 ? "Off" : $"{CountdownSeconds}s";
+
+    public bool KeySoundEnabled
+    {
+        get => _settings.KeySoundEnabled;
+        set => UpdateSettings(_settings with { KeySoundEnabled = value });
+    }
+
+    public bool MistakeSoundEnabled
+    {
+        get => _settings.MistakeSoundEnabled;
+        set => UpdateSettings(_settings with { MistakeSoundEnabled = value });
+    }
+
     public bool ShowVisualKeyboard
     {
         get => _settings.ShowVisualKeyboard;
@@ -199,6 +226,31 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     {
         get => _settings.PracticeCursorStyle;
         set => UpdateSettings(_settings with { PracticeCursorStyle = value });
+    }
+
+    public string ThemePreset
+    {
+        get => _settings.ThemePreset;
+        set => UpdateSettings(_settings with { ThemePreset = string.IsNullOrWhiteSpace(value) ? AppSettings.DefaultThemePreset : value });
+    }
+
+    public string DifficultyPreset
+    {
+        get => _settings.DifficultyPreset;
+        set => UpdateSettings(ApplyDifficultyPreset(_settings with { DifficultyPreset = string.IsNullOrWhiteSpace(value) ? AppSettings.DefaultDifficultyPreset : value }));
+    }
+
+    public string AppVersionText
+    {
+        get
+        {
+            var version = typeof(SettingsViewModel).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                .InformationalVersion
+                ?? typeof(SettingsViewModel).Assembly.GetName().Version?.ToString()
+                ?? "Unknown";
+            return $"Typing Trainer {version}";
+        }
     }
 
     public bool NormalizeImportedTextToAscii
@@ -567,6 +619,11 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(BackspaceAllowed));
         OnPropertyChanged(nameof(AutoSaveCompletedSessions));
         OnPropertyChanged(nameof(RequireCorrectKeyToAdvance));
+        OnPropertyChanged(nameof(ZenModeEnabled));
+        OnPropertyChanged(nameof(CountdownSeconds));
+        OnPropertyChanged(nameof(CountdownText));
+        OnPropertyChanged(nameof(KeySoundEnabled));
+        OnPropertyChanged(nameof(MistakeSoundEnabled));
         OnPropertyChanged(nameof(ShowVisualKeyboard));
         OnPropertyChanged(nameof(ShowFingerColors));
         OnPropertyChanged(nameof(ShowFingerLabels));
@@ -582,9 +639,38 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(PracticeLineWidth));
         OnPropertyChanged(nameof(PracticeTextContrast));
         OnPropertyChanged(nameof(PracticeCursorStyle));
+        OnPropertyChanged(nameof(ThemePreset));
+        OnPropertyChanged(nameof(DifficultyPreset));
+        OnPropertyChanged(nameof(AppVersionText));
         OnPropertyChanged(nameof(NormalizeImportedTextToAscii));
         OnPropertyChanged(nameof(LowercaseImportedText));
         OnPropertyChanged(nameof(NormalizeImportedWhitespace));
+    }
+
+    private static AppSettings ApplyDifficultyPreset(AppSettings settings)
+    {
+        return settings.DifficultyPreset switch
+        {
+            "Speed Words" => settings with
+            {
+                AllowCapitalLetters = false,
+                AllowNumbers = false,
+                AllowPunctuation = false
+            },
+            "Clean Copy" => settings with
+            {
+                AllowCapitalLetters = true,
+                AllowNumbers = false,
+                AllowPunctuation = true
+            },
+            "Symbols" => settings with
+            {
+                AllowCapitalLetters = true,
+                AllowNumbers = true,
+                AllowPunctuation = true
+            },
+            _ => settings
+        };
     }
 
     private static string FormatFileSize(long bytes)

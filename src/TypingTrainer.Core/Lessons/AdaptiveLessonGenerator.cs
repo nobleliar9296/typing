@@ -1,3 +1,4 @@
+using TypingTrainer.Core.Keyboard;
 using TypingTrainer.Core.Skill;
 
 namespace TypingTrainer.Core.Lessons;
@@ -7,6 +8,13 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
     private readonly IWordListProvider _wordListProvider;
     private readonly CharacterUnlockPlanner _unlockPlanner;
     private readonly FixedLessonGenerator _fixedLessonGenerator = new();
+    private static readonly QwertyCharacterToKeyMapper KeyMapper = new();
+    private static readonly IReadOnlyDictionary<string, VisualKeyboardKey> LayoutKeys =
+        QwertyVisualKeyboardLayout
+            .Create()
+            .Rows
+            .SelectMany(row => row.Keys)
+            .ToDictionary(key => key.Id, StringComparer.Ordinal);
 
     public AdaptiveLessonGenerator(
         IWordListProvider wordListProvider,
@@ -60,7 +68,7 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
             .Where(unlockedCharacters.Contains)
             .ToHashSet();
         var weightedWords = candidateWords
-            .Select(word => (Item: word, Weight: ScoreWord(word, focusCharacters, focusBigrams, newestUnlockedCharacters)))
+            .Select(word => (Item: word, Weight: ScoreWord(word, focusCharacters, focusBigrams, newestUnlockedCharacters, options)))
             .ToArray();
         var words = new List<string>();
 
@@ -120,11 +128,32 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
         }
 
         var limit = options.Mode == LessonMode.WeakKeys ? 5 : 4;
-        var weakCharacters = profile.Characters.Values
+        var candidates = profile.Characters.Values
             .Where(skill => unlockedCharacters.Contains(skill.Character))
-            .Where(skill => skill.ExposureCount >= 5)
-            .OrderByDescending(skill => skill.WeaknessScore)
-            .ThenByDescending(skill => skill.ExposureCount)
+            .Where(skill => skill.ExposureCount >= 5);
+        var focus = NormalizeFocus(options.TrainingFocus);
+
+        candidates = focus switch
+        {
+            "Punctuation" => candidates.Where(skill => char.IsPunctuation(skill.Character)),
+            "WeakLeftHand" => candidates.Where(skill => IsLeftHandCharacter(skill.Character)),
+            "WeakRightHand" => candidates.Where(skill => IsRightHandCharacter(skill.Character)),
+            _ => candidates
+        };
+
+        var orderedCharacters = focus switch
+        {
+            "SpeedFirst" => candidates
+                .OrderByDescending(skill => skill.MedianLatencyMs ?? 0)
+                .ThenByDescending(skill => skill.WeaknessScore),
+            "AccuracyFirst" => candidates
+                .OrderByDescending(skill => skill.IncorrectCount)
+                .ThenBy(skill => skill.Accuracy),
+            _ => candidates
+                .OrderByDescending(skill => skill.WeaknessScore)
+                .ThenByDescending(skill => skill.ExposureCount)
+        };
+        var weakCharacters = orderedCharacters
             .Take(limit)
             .Select(skill => skill.Character)
             .ToArray();
@@ -134,10 +163,18 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
             return weakCharacters;
         }
 
-        return _unlockPlanner
+        var newest = _unlockPlanner
             .GetNewestUnlockedStageCharacters(profile, options.KeyboardLayout)
-            .Where(unlockedCharacters.Contains)
-            .Take(limit);
+            .Where(unlockedCharacters.Contains);
+        newest = focus switch
+        {
+            "Punctuation" => newest.Where(char.IsPunctuation),
+            "WeakLeftHand" => newest.Where(IsLeftHandCharacter),
+            "WeakRightHand" => newest.Where(IsRightHandCharacter),
+            _ => newest
+        };
+
+        return newest.Take(limit);
     }
 
     private static IEnumerable<string> SelectFocusBigrams(
@@ -151,11 +188,21 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
         }
 
         var limit = options.Mode == LessonMode.WeakBigrams ? 8 : 3;
-
-        return profile.Bigrams.Values
+        var focus = NormalizeFocus(options.TrainingFocus);
+        var candidates = profile.Bigrams.Values
             .Where(skill => skill.Bigram.Length == 2)
             .Where(skill => skill.ExposureCount >= 3)
-            .Where(skill => skill.Bigram.All(unlockedCharacters.Contains))
+            .Where(skill => skill.Bigram.All(unlockedCharacters.Contains));
+
+        candidates = focus switch
+        {
+            "Punctuation" => candidates.Where(skill => skill.Bigram.Any(char.IsPunctuation)),
+            "WeakLeftHand" => candidates.Where(skill => skill.Bigram.Any(IsLeftHandCharacter)),
+            "WeakRightHand" => candidates.Where(skill => skill.Bigram.Any(IsRightHandCharacter)),
+            _ => candidates
+        };
+
+        return candidates
             .OrderByDescending(skill => skill.WeaknessScore)
             .ThenByDescending(skill => skill.MedianLatencyMs ?? 0)
             .Take(limit)
@@ -166,9 +213,11 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
         string word,
         IReadOnlyList<char> focusCharacters,
         IReadOnlyList<string> focusBigrams,
-        IReadOnlySet<char> newlyUnlockedCharacters)
+        IReadOnlySet<char> newlyUnlockedCharacters,
+        LessonGenerationOptions options)
     {
         var score = 1.0;
+        var focus = NormalizeFocus(options.TrainingFocus);
 
         foreach (var focusCharacter in focusCharacters)
         {
@@ -196,12 +245,71 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
             score += 1.5;
         }
 
+        score += focus switch
+        {
+            "Punctuation" => word.Any(char.IsPunctuation) ? 3.0 : -0.35,
+            "WeakLeftHand" => word.Count(IsLeftHandCharacter) * 0.4,
+            "WeakRightHand" => word.Count(IsRightHandCharacter) * 0.4,
+            "SpeedFirst" => word.Length is >= 4 and <= 8 ? 1.0 : 0.0,
+            "AccuracyFirst" => word.Any(focusCharacters.Contains) ? 1.0 : 0.0,
+            _ => 0.0
+        };
+
+        score += options.DifficultyPreset switch
+        {
+            "Speed Words" => word.Any(character => char.IsPunctuation(character) || char.IsDigit(character) || char.IsUpper(character)) ? -0.75 : 0.6,
+            "Symbols" => word.Any(character => char.IsPunctuation(character) || char.IsDigit(character)) ? 1.6 : -0.25,
+            "Clean Copy" => word.Any(char.IsUpper) || word.Any(char.IsPunctuation) ? 0.4 : 0.0,
+            _ => 0.0
+        };
+
         if (word.GroupBy(character => character).Any(group => group.Count() > Math.Max(2, word.Length / 2)))
         {
             score -= 0.5;
         }
 
         return Math.Max(0.1, score);
+    }
+
+    private static string NormalizeFocus(string? value)
+    {
+        return value?.Replace(" ", string.Empty, StringComparison.Ordinal) switch
+        {
+            "Accuracy" or "AccuracyFirst" => "AccuracyFirst",
+            "Speed" or "SpeedFirst" => "SpeedFirst",
+            "WeakLeftHand" => "WeakLeftHand",
+            "WeakRightHand" => "WeakRightHand",
+            "Punctuation" => "Punctuation",
+            _ => "Balanced"
+        };
+    }
+
+    private static bool IsLeftHandCharacter(char character)
+    {
+        return IsCharacterAssignedTo(character, finger => finger is
+            FingerAssignment.LeftPinky
+            or FingerAssignment.LeftRing
+            or FingerAssignment.LeftMiddle
+            or FingerAssignment.LeftIndex
+            or FingerAssignment.LeftThumb);
+    }
+
+    private static bool IsRightHandCharacter(char character)
+    {
+        return IsCharacterAssignedTo(character, finger => finger is
+            FingerAssignment.RightPinky
+            or FingerAssignment.RightRing
+            or FingerAssignment.RightMiddle
+            or FingerAssignment.RightIndex
+            or FingerAssignment.RightThumb);
+    }
+
+    private static bool IsCharacterAssignedTo(char character, Func<FingerAssignment, bool> predicate)
+    {
+        var mapping = KeyMapper.Map(character);
+        return mapping is not null
+            && LayoutKeys.TryGetValue(mapping.KeyId, out var key)
+            && predicate(key.Finger);
     }
 
     private static bool CanTypeWord(string word, IReadOnlySet<char> allowedCharacters)

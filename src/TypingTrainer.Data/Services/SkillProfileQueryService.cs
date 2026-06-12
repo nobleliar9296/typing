@@ -100,9 +100,18 @@ public sealed class SkillProfileQueryService : ISkillProfileQueryService
         command.CommandText = """
             SELECT session_id, position, expected_char, actual_char, event_kind,
                    is_correct, was_correction, delta_previous_ms, elapsed_ms, timestamp_ticks
-            FROM key_events
-            WHERE event_kind = 'Character'
-              AND expected_char IS NOT NULL
+            FROM (
+                SELECT event.session_id, event.position, event.expected_char, event.actual_char,
+                       event.event_kind, event.is_correct, event.was_correction,
+                       event.delta_previous_ms, event.elapsed_ms, event.timestamp_ticks,
+                       session.started_at_utc
+                FROM key_events event
+                INNER JOIN practice_sessions session ON session.id = event.session_id
+                WHERE event.event_kind = 'Character'
+                  AND event.expected_char IS NOT NULL
+                ORDER BY session.started_at_utc DESC, event.timestamp_ticks DESC
+                LIMIT 5000
+            )
             ORDER BY session_id, timestamp_ticks ASC;
             """;
 

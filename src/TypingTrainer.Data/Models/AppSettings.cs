@@ -11,6 +11,10 @@ public sealed record AppSettings(
     bool BackspaceAllowed,
     bool AutoSaveCompletedSessions,
     bool RequireCorrectKeyToAdvance,
+    bool ZenModeEnabled,
+    int CountdownSeconds,
+    bool KeySoundEnabled,
+    bool MistakeSoundEnabled,
     bool ShowVisualKeyboard,
     bool ShowFingerColors,
     bool ShowFingerLabels,
@@ -29,7 +33,9 @@ public sealed record AppSettings(
     string PracticeFontFamily,
     string PracticeLineWidth,
     string PracticeTextContrast,
-    string PracticeCursorStyle)
+    string PracticeCursorStyle,
+    string ThemePreset,
+    string DifficultyPreset)
 {
     public const string AutoLessonMode = "Auto";
     public const string QwertyKeyboardLayout = "QWERTY";
@@ -38,6 +44,8 @@ public sealed record AppSettings(
     public const string DefaultLineWidth = "Comfortable";
     public const string DefaultTextContrast = "Normal";
     public const string DefaultCursorStyle = "Underline";
+    public const string DefaultThemePreset = "System";
+    public const string DefaultDifficultyPreset = "Custom";
 
     public static AppSettings Defaults { get; } = new(
         AutoLessonMode,
@@ -50,6 +58,10 @@ public sealed record AppSettings(
         BackspaceAllowed: true,
         AutoSaveCompletedSessions: true,
         RequireCorrectKeyToAdvance: false,
+        ZenModeEnabled: false,
+        CountdownSeconds: 0,
+        KeySoundEnabled: false,
+        MistakeSoundEnabled: false,
         ShowVisualKeyboard: true,
         ShowFingerColors: true,
         ShowFingerLabels: false,
@@ -68,5 +80,7 @@ public sealed record AppSettings(
         PracticeFontFamily: DefaultFontFamily,
         PracticeLineWidth: DefaultLineWidth,
         PracticeTextContrast: DefaultTextContrast,
-        PracticeCursorStyle: DefaultCursorStyle);
+        PracticeCursorStyle: DefaultCursorStyle,
+        ThemePreset: DefaultThemePreset,
+        DifficultyPreset: DefaultDifficultyPreset);
 }

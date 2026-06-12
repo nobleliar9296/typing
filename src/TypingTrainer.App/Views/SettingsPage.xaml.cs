@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using TypingTrainer.App.Services;
 using TypingTrainer.App.ViewModels;
 using TypingTrainer.Data.Models;
 using Windows.Storage.Pickers;
@@ -37,6 +38,29 @@ public sealed partial class SettingsPage : Page
             "WeakKeys" => 4,
             "WeakBigrams" => 5,
             "Review" => 6,
+            "Clipboard" => 7,
+            _ => 0
+        };
+        TrainingFocusComboBox.SelectedIndex = ViewModel.GoalTrainingFocus switch
+        {
+            "AccuracyFirst" or "Accuracy First" or "Accuracy" => 1,
+            "SpeedFirst" or "Speed First" or "Speed" => 2,
+            "WeakLeftHand" or "Weak Left Hand" => 3,
+            "WeakRightHand" or "Weak Right Hand" => 4,
+            "Punctuation" => 5,
+            _ => 0
+        };
+        ThemePresetComboBox.SelectedIndex = ViewModel.ThemePreset switch
+        {
+            "Dark" => 1,
+            "Light" => 2,
+            _ => 0
+        };
+        DifficultyPresetComboBox.SelectedIndex = ViewModel.DifficultyPreset switch
+        {
+            "Speed Words" => 1,
+            "Clean Copy" => 2,
+            "Symbols" => 3,
             _ => 0
         };
         _isLoaded = true;
@@ -57,7 +81,58 @@ public sealed partial class SettingsPage : Page
             4 => "WeakKeys",
             5 => "WeakBigrams",
             6 => "Review",
+            7 => "Clipboard",
             _ => AppSettings.AutoLessonMode
+        };
+    }
+
+    private void TrainingFocusComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded)
+        {
+            return;
+        }
+
+        ViewModel.GoalTrainingFocus = TrainingFocusComboBox.SelectedIndex switch
+        {
+            1 => "AccuracyFirst",
+            2 => "SpeedFirst",
+            3 => "WeakLeftHand",
+            4 => "WeakRightHand",
+            5 => "Punctuation",
+            _ => "Balanced"
+        };
+    }
+
+    private void ThemePresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded)
+        {
+            return;
+        }
+
+        ViewModel.ThemePreset = ThemePresetComboBox.SelectedIndex switch
+        {
+            1 => "Dark",
+            2 => "Light",
+            _ => "System"
+        };
+        AppThemeService.Apply(ViewModel.ThemePreset);
+    }
+
+    private void DifficultyPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded)
+        {
+            return;
+        }
+
+        ViewModel.DifficultyPreset = DifficultyPresetComboBox.SelectedIndex switch
+        {
+            1 => "Speed Words",
+            2 => "Clean Copy",
+            3 => "Symbols",
+            _ => "Custom"
         };
     }
 

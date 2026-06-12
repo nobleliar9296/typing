@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using TypingTrainer.Core.Coaching;
+using TypingTrainer.Core.Keyboard;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Data.Repositories;
 using TypingTrainer.Data.Services;
@@ -27,8 +28,17 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     private string? _errorMessage;
     private string _goalStatus = string.Empty;
     private string _selectedModeFilter = AllModesFilter;
+    private string _selectedKeyFilter = AllKeysFilter;
+    private static readonly QwertyCharacterToKeyMapper KeyMapper = new();
+    private static readonly IReadOnlyDictionary<string, VisualKeyboardKey> LayoutKeys =
+        QwertyVisualKeyboardLayout
+            .Create()
+            .Rows
+            .SelectMany(row => row.Keys)
+            .ToDictionary(key => key.Id, StringComparer.Ordinal);
 
     public const string AllModesFilter = "All modes";
+    public const string AllKeysFilter = "All keys";
 
     public DashboardViewModel(
         IAnalyticsQueryService analyticsQueryService,
@@ -66,6 +76,21 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             {
                 _selectedModeFilter = value;
                 OnPropertyChanged();
+            }
+        }
+    }
+
+    public string SelectedKeyFilter
+    {
+        get => _selectedKeyFilter;
+        set
+        {
+            if (_selectedKeyFilter != value)
+            {
+                _selectedKeyFilter = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HeatmapRows));
+                OnPropertyChanged(nameof(HandFingerRows));
             }
         }
     }
@@ -248,6 +273,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         .ToArray();
 
     public IReadOnlyList<KeyboardHeatmapDisplayRow> HeatmapRows => _heatmapRows
+        .Where(MatchesKeyFilter)
         .OrderByDescending(row => row.WeaknessScore)
         .ThenByDescending(row => row.ExposureCount)
         .Select(row => new KeyboardHeatmapDisplayRow(
@@ -255,7 +281,30 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             FormatPercent(row.Accuracy),
             FormatLatency(row.MedianLatencyMs),
             row.ExposureCount.ToString(CultureInfo.InvariantCulture),
-            row.WeaknessScore * 100))
+            row.WeaknessScore * 100,
+            FormatHeatmapTrend(row.WeaknessScore)))
+        .ToArray();
+
+    public IReadOnlyList<HandFingerDisplayRow> HandFingerRows => _heatmapRows
+        .Select(row => (Row: row, Key: GetVisualKey(row.Character)))
+        .Where(item => item.Key is not null)
+        .GroupBy(item => ToFingerGroup(item.Key!.Finger), StringComparer.Ordinal)
+        .Select(group =>
+        {
+            var rows = group.Select(item => item.Row).ToArray();
+            var samples = rows.Sum(row => row.ExposureCount);
+            var correct = rows.Sum(row => row.CorrectCount);
+            var median = AnalyticsMedian(rows.Select(row => row.MedianLatencyMs).OfType<double>());
+            var weakness = rows.Length == 0 ? 0 : rows.Average(row => row.WeaknessScore) * 100;
+            return new HandFingerDisplayRow(
+                group.Key,
+                FormatPercent(samples == 0 ? 0 : correct / (double)samples),
+                FormatLatency(median),
+                samples.ToString(CultureInfo.InvariantCulture),
+                weakness,
+                FormatHeatmapTrend(weakness / 100.0));
+        })
+        .OrderByDescending(row => row.WeaknessPercent)
         .ToArray();
 
     public IReadOnlyList<PersonalBestDisplayRow> PersonalBestRows => _trainingHistory?.PersonalBests
@@ -667,6 +716,96 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             : SelectedModeFilter.Replace(" ", string.Empty, StringComparison.Ordinal);
     }
 
+    private bool MatchesKeyFilter(KeyboardHeatmapKeyRow row)
+    {
+        if (string.Equals(SelectedKeyFilter, AllKeysFilter, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var key = GetVisualKey(row.Character);
+        return SelectedKeyFilter switch
+        {
+            "Left hand" => key is not null && IsLeftFinger(key.Finger),
+            "Right hand" => key is not null && IsRightFinger(key.Finger),
+            "Home row" => key is not null && "ASDFGHJKL;".Contains(key.PrimaryLabel, StringComparison.OrdinalIgnoreCase),
+            "Top row" => key is not null && "QWERTYUIOP".Contains(key.PrimaryLabel, StringComparison.OrdinalIgnoreCase),
+            "Bottom row" => key is not null && "ZXCVBNM,./".Contains(key.PrimaryLabel, StringComparison.OrdinalIgnoreCase),
+            "Letters" => char.IsLetter(row.Character),
+            "Punctuation" => char.IsPunctuation(row.Character),
+            "Numbers" => char.IsDigit(row.Character),
+            _ => true
+        };
+    }
+
+    private static VisualKeyboardKey? GetVisualKey(char character)
+    {
+        var mapping = KeyMapper.Map(character);
+        return mapping is not null && LayoutKeys.TryGetValue(mapping.KeyId, out var key)
+            ? key
+            : null;
+    }
+
+    private static string ToFingerGroup(FingerAssignment finger)
+    {
+        return finger switch
+        {
+            FingerAssignment.LeftPinky => "Left pinky",
+            FingerAssignment.LeftRing => "Left ring",
+            FingerAssignment.LeftMiddle => "Left middle",
+            FingerAssignment.LeftIndex => "Left index",
+            FingerAssignment.LeftThumb => "Left thumb",
+            FingerAssignment.RightThumb => "Right thumb",
+            FingerAssignment.RightIndex => "Right index",
+            FingerAssignment.RightMiddle => "Right middle",
+            FingerAssignment.RightRing => "Right ring",
+            FingerAssignment.RightPinky => "Right pinky",
+            _ => "Other"
+        };
+    }
+
+    private static bool IsLeftFinger(FingerAssignment finger)
+    {
+        return finger is FingerAssignment.LeftPinky
+            or FingerAssignment.LeftRing
+            or FingerAssignment.LeftMiddle
+            or FingerAssignment.LeftIndex
+            or FingerAssignment.LeftThumb;
+    }
+
+    private static bool IsRightFinger(FingerAssignment finger)
+    {
+        return finger is FingerAssignment.RightPinky
+            or FingerAssignment.RightRing
+            or FingerAssignment.RightMiddle
+            or FingerAssignment.RightIndex
+            or FingerAssignment.RightThumb;
+    }
+
+    private static string FormatHeatmapTrend(double weaknessScore)
+    {
+        return weaknessScore switch
+        {
+            >= 0.68 => "Worsening",
+            >= 0.34 => "Steady",
+            _ => "Improving"
+        };
+    }
+
+    private static double? AnalyticsMedian(IEnumerable<double> values)
+    {
+        var sorted = values.OrderBy(value => value).ToArray();
+        if (sorted.Length == 0)
+        {
+            return null;
+        }
+
+        var middle = sorted.Length / 2;
+        return sorted.Length % 2 == 1
+            ? sorted[middle]
+            : (sorted[middle - 1] + sorted[middle]) / 2.0;
+    }
+
     private void UpdateGoalSettings(AppSettings settings)
     {
         _settings = settings;
@@ -726,6 +865,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(WeakestBigramRows));
         OnPropertyChanged(nameof(SlowestBigramRows));
         OnPropertyChanged(nameof(HeatmapRows));
+        OnPropertyChanged(nameof(HandFingerRows));
         OnTrainingHistoryChanged();
         OnGoalSettingsChanged();
     }
@@ -805,7 +945,16 @@ public sealed record KeyboardHeatmapDisplayRow(
     string Accuracy,
     string MedianLatencyMs,
     string Samples,
-    double WeaknessPercent);
+    double WeaknessPercent,
+    string Trend);
+
+public sealed record HandFingerDisplayRow(
+    string Group,
+    string Accuracy,
+    string MedianLatencyMs,
+    string Samples,
+    double WeaknessPercent,
+    string Trend);
 
 public sealed record AnalyticsDisplayRow(
     string Label,

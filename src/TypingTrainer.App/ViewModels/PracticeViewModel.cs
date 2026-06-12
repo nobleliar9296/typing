@@ -22,6 +22,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private readonly ICharacterToKeyMapper _keyMapper = new QwertyCharacterToKeyMapper();
     private readonly VisualKeyboardLayout _visualKeyboardLayout = QwertyVisualKeyboardLayout.Create();
     private readonly List<SessionNetWpmSample> _sessionNetWpmSamples = [];
+    private readonly DispatcherTimer _countdownTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private TypingSession _session;
     private TypingStateSnapshot _currentState;
     private LessonGenerationResult _currentLesson;
@@ -31,13 +32,17 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private bool _completionQueued;
     private bool _isGeneratingLesson;
     private bool _isPaused;
+    private bool _isCountdownActive;
     private bool _isReviewPopupDismissed;
     private bool _isStopped;
+    private bool _hasStartedTyping;
     private long? _lastEscapeTimestampTicks;
+    private int _countdownRemaining;
     private int _sessionGeneration;
     private string _completionStatus = string.Empty;
     private string _pauseStatus = string.Empty;
     private string _typingFeedback = string.Empty;
+    private string _reviewRetryStatus = string.Empty;
     private SessionSummary? _lastSummary;
     private SessionReview? _lastReview;
     private IReadOnlyList<TypingInputEvent> _lastCompletedEvents = Array.Empty<TypingInputEvent>();
@@ -58,6 +63,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
                 KeyboardLayoutRepository.Qwerty));
         _session = new TypingSession(_currentLesson.Text);
         _currentState = _session.GetSnapshot(Stopwatch.GetTimestamp());
+        _countdownTimer.Tick += CountdownTimer_Tick;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -195,7 +201,39 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool IsInputEnabled => !IsGeneratingLesson && !_completionQueued;
+    public bool IsInputEnabled => !IsGeneratingLesson && !_completionQueued && !_isCountdownActive;
+
+    public Visibility PracticeStatsVisibility => _settings.ZenModeEnabled
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+
+    public bool KeySoundEnabled => _settings.KeySoundEnabled;
+
+    public bool MistakeSoundEnabled => _settings.MistakeSoundEnabled;
+
+    public string ReadyStatusText
+    {
+        get
+        {
+            if (_isCountdownActive)
+            {
+                return $"Starting in {_countdownRemaining}...";
+            }
+
+            if (!_hasStartedTyping && !CurrentState.IsComplete && !_completionQueued)
+            {
+                return _settings.CountdownSeconds > 0
+                    ? "Ready. Press any key to start the countdown."
+                    : "Ready. Start typing.";
+            }
+
+            return string.Empty;
+        }
+    }
+
+    public Visibility ReadyStatusVisibility => string.IsNullOrWhiteSpace(ReadyStatusText)
+        ? Visibility.Collapsed
+        : Visibility.Visible;
 
     public Visibility ReviewPopupVisibility => _completionQueued && !_isReviewPopupDismissed
         ? Visibility.Visible
@@ -303,7 +341,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _ => 1040
     };
 
-    public Visibility VisualKeyboardVisibility => ShowVisualKeyboard
+    public Visibility VisualKeyboardVisibility => ShowVisualKeyboard && !_settings.ZenModeEnabled
         ? Visibility.Visible
         : Visibility.Collapsed;
 
@@ -326,6 +364,30 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     public string SessionNetWpmLowText => FormatNetWpmExtreme("Low", samples => samples.Min());
 
     public IReadOnlyList<PracticeReviewRow> ReviewRows => BuildReviewRows(_lastReview);
+
+    public IReadOnlyList<CostlyMistakeRow> CostlyMistakeRows => BuildCostlyMistakeRows(_lastCompletedEvents);
+
+    public string ReviewRecommendationTitle => BuildReviewRecommendation().Title;
+
+    public string ReviewRecommendationDetail => BuildReviewRecommendation().Detail;
+
+    public string ReviewRetryStatus
+    {
+        get => _reviewRetryStatus;
+        private set
+        {
+            if (_reviewRetryStatus != value)
+            {
+                _reviewRetryStatus = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ReviewRetryStatusVisibility));
+            }
+        }
+    }
+
+    public Visibility ReviewRetryStatusVisibility => string.IsNullOrWhiteSpace(ReviewRetryStatus)
+        ? Visibility.Collapsed
+        : Visibility.Visible;
 
     public IReadOnlyList<string> ReviewNotes => _lastReview?.Notes ?? Array.Empty<string>();
 
@@ -426,8 +488,87 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         }
     }
 
+    public async Task StartClipboardLessonAsync(string clipboardText, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            IsGeneratingLesson = true;
+            CompletionStatus = "Preparing clipboard lesson...";
+            _settings = await _lessonService.GetSettingsAsync(cancellationToken);
+            var targetCharacters = PracticeLessonSizeTargets.GetTargetCharacters(
+                SelectedLessonSize,
+                _settings.LessonLengthCharacters);
+            var lesson = await _lessonService.GenerateClipboardLessonAsync(
+                clipboardText,
+                targetCharacters,
+                cancellationToken);
+            SelectedLessonMode = LessonMode.Clipboard;
+            StartSession(lesson, LessonMode.Clipboard);
+        }
+        finally
+        {
+            IsGeneratingLesson = false;
+        }
+    }
+
+    public bool StartRetryFromNetWpmPoint(int pointIndex)
+    {
+        if (_lastSummary is null || _sessionNetWpmSamples.Count == 0)
+        {
+            ReviewRetryStatus = "No completed session text is available for retry.";
+            return false;
+        }
+
+        var boundedIndex = Math.Clamp(pointIndex, 0, _sessionNetWpmSamples.Count - 1);
+        var sample = _sessionNetWpmSamples[boundedIndex];
+        var retryText = ExtractRetrySlice(_lastSummary.TargetText, sample.CursorIndex, 220);
+        if (string.IsNullOrWhiteSpace(retryText))
+        {
+            ReviewRetryStatus = "Could not find enough text around that point.";
+            return false;
+        }
+
+        var lesson = new LessonGenerationResult(
+            retryText,
+            retryText.Where(character => !char.IsWhiteSpace(character)).ToHashSet(),
+            Array.Empty<char>(),
+            Array.Empty<string>(),
+            $"Retry pace dip near {FormatElapsedLabel(sample.ElapsedMs)}",
+            "WPM dip retry",
+            "Last session");
+        SelectedLessonMode = LessonMode.Review;
+        StartSession(lesson, LessonMode.Review);
+        return true;
+    }
+
+    public string CreateReviewSummaryText()
+    {
+        var lines = new List<string>
+        {
+            "Typing Trainer session review",
+            $"Raw WPM: {CompletionRawWpmText}",
+            $"Net WPM: {CompletionNetWpmText}",
+            $"Accuracy: {CompletionAccuracyText}",
+            $"Errors: {CompletionErrorsText}",
+            $"{ReviewRecommendationTitle}: {ReviewRecommendationDetail}",
+            string.Empty,
+            "Most costly mistakes"
+        };
+
+        foreach (var row in CostlyMistakeRows.DefaultIfEmpty(new CostlyMistakeRow("-", "-", "-", "-", 0)))
+        {
+            lines.Add($"{row.Label}: {row.Impact}, {row.Accuracy}, {row.MedianLatencyMs} ms, {row.Samples} samples");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("Notes");
+        lines.AddRange(ReviewNotes.DefaultIfEmpty("No review notes were generated."));
+        return string.Join(Environment.NewLine, lines);
+    }
+
     private void StartSession(LessonGenerationResult lesson, LessonMode mode)
     {
+        _countdownTimer.Stop();
         _sessionGeneration++;
         _currentLesson = lesson;
         _activeLessonMode = mode;
@@ -436,9 +577,12 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             : lesson.Text,
             CreateTypingSessionOptions());
         _completionQueued = false;
+        _isCountdownActive = false;
         _isReviewPopupDismissed = false;
         IsPaused = false;
         _isStopped = false;
+        _hasStartedTyping = false;
+        _countdownRemaining = 0;
         _lastEscapeTimestampTicks = null;
         _lastSummary = null;
         _lastReview = null;
@@ -447,6 +591,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         CompletionStatus = string.Empty;
         PauseStatus = string.Empty;
         TypingFeedback = string.Empty;
+        ReviewRetryStatus = string.Empty;
         OnVisualKeyboardSettingsChanged();
         CurrentState = _session.GetSnapshot(Stopwatch.GetTimestamp());
         OnLessonChanged();
@@ -455,11 +600,11 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnSessionNetWpmChanged();
     }
 
-    public void HandleCharacter(char character)
+    public PracticeInputFeedback HandleCharacter(char character)
     {
         if (IsGeneratingLesson)
         {
-            return;
+            return PracticeInputFeedback.None;
         }
 
         if (_isStopped || _completionQueued || CurrentState.IsComplete)
@@ -469,9 +614,21 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
         if (IsPaused)
         {
-            return;
+            return PracticeInputFeedback.None;
         }
 
+        if (_isCountdownActive)
+        {
+            return PracticeInputFeedback.None;
+        }
+
+        if (!_hasStartedTyping && _settings.CountdownSeconds > 0)
+        {
+            StartCountdown();
+            return PracticeInputFeedback.CountdownStarted;
+        }
+
+        _hasStartedTyping = true;
         _lastEscapeTimestampTicks = null;
         var result = _session.ProcessCharacter(character, Stopwatch.GetTimestamp());
         CurrentState = result.State;
@@ -490,13 +647,17 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             OnCompletionChanged();
             _ = CompleteAndQueueSessionAsync(completedSession, completedGeneration, completedMode);
         }
+
+        return result.WasRejected
+            ? PracticeInputFeedback.Mistake
+            : PracticeInputFeedback.Key;
     }
 
-    public void HandleBackspace()
+    public PracticeInputFeedback HandleBackspace()
     {
         if (_completionQueued || IsGeneratingLesson || IsPaused || _isStopped)
         {
-            return;
+            return PracticeInputFeedback.None;
         }
 
         _lastEscapeTimestampTicks = null;
@@ -508,6 +669,9 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         }
 
         TypingFeedback = result.WasAccepted ? string.Empty : result.FeedbackMessage ?? string.Empty;
+        return result.WasAccepted
+            ? PracticeInputFeedback.Key
+            : PracticeInputFeedback.None;
     }
 
     public void HandleEscape(long timestampTicks)
@@ -602,6 +766,8 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(PaceGuidanceText));
         OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(IsInputEnabled));
+        OnPropertyChanged(nameof(ReadyStatusText));
+        OnPropertyChanged(nameof(ReadyStatusVisibility));
         OnPropertyChanged(nameof(CompletionStatus));
         OnPropertyChanged(nameof(TypingFeedback));
         OnPropertyChanged(nameof(TypingFeedbackVisibility));
@@ -623,6 +789,8 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ReviewPopupVisibility));
         OnPropertyChanged(nameof(PracticeContentOpacity));
         OnPropertyChanged(nameof(IsInputEnabled));
+        OnPropertyChanged(nameof(ReadyStatusText));
+        OnPropertyChanged(nameof(ReadyStatusVisibility));
         OnPropertyChanged(nameof(CompletionRawWpmText));
         OnPropertyChanged(nameof(CompletionNetWpmText));
         OnPropertyChanged(nameof(CompletionAccuracyText));
@@ -632,6 +800,9 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private void OnReviewChanged()
     {
         OnPropertyChanged(nameof(ReviewRows));
+        OnPropertyChanged(nameof(CostlyMistakeRows));
+        OnPropertyChanged(nameof(ReviewRecommendationTitle));
+        OnPropertyChanged(nameof(ReviewRecommendationDetail));
         OnPropertyChanged(nameof(ReviewNotes));
         OnPropertyChanged(nameof(ReviewVisibility));
         OnPropertyChanged(nameof(CanPracticeMistakes));
@@ -659,6 +830,9 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ShowVisualKeyboard));
         OnPropertyChanged(nameof(ShowFingerColors));
         OnPropertyChanged(nameof(ShowFingerLabels));
+        OnPropertyChanged(nameof(PracticeStatsVisibility));
+        OnPropertyChanged(nameof(KeySoundEnabled));
+        OnPropertyChanged(nameof(MistakeSoundEnabled));
         OnPropertyChanged(nameof(PracticeTextScale));
         OnPropertyChanged(nameof(VisualKeyboardScale));
         OnPropertyChanged(nameof(PracticeFontFamily));
@@ -667,6 +841,35 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(PracticeLineWidthMax));
         OnPropertyChanged(nameof(VisualKeyboardVisibility));
         OnKeyboardHighlightChanged();
+    }
+
+    private void StartCountdown()
+    {
+        _countdownRemaining = Math.Clamp(_settings.CountdownSeconds, 1, 3);
+        _isCountdownActive = true;
+        TypingFeedback = string.Empty;
+        OnCountdownChanged();
+        _countdownTimer.Start();
+    }
+
+    private void CountdownTimer_Tick(object? sender, object e)
+    {
+        _countdownRemaining--;
+        if (_countdownRemaining <= 0)
+        {
+            _countdownTimer.Stop();
+            _isCountdownActive = false;
+            _hasStartedTyping = true;
+        }
+
+        OnCountdownChanged();
+    }
+
+    private void OnCountdownChanged()
+    {
+        OnPropertyChanged(nameof(IsInputEnabled));
+        OnPropertyChanged(nameof(ReadyStatusText));
+        OnPropertyChanged(nameof(ReadyStatusVisibility));
     }
 
     private static string FormatWpm(double value)
@@ -712,7 +915,8 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
         _sessionNetWpmSamples.Add(new SessionNetWpmSample(
             Math.Max(0, snapshot.ElapsedMs),
-            CalculateLiveNetWpm(snapshot)));
+            CalculateLiveNetWpm(snapshot),
+            Math.Clamp(snapshot.CursorIndex, 0, snapshot.TargetText.Length)));
         OnSessionNetWpmChanged();
     }
 
@@ -730,6 +934,150 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private static string FormatElapsedLabel(double elapsedMs)
     {
         return TimeSpan.FromMilliseconds(elapsedMs).ToString(@"m\:ss", CultureInfo.InvariantCulture);
+    }
+
+    private (string Title, string Detail) BuildReviewRecommendation()
+    {
+        if (_lastSummary is null)
+        {
+            return ("What to fix next", "Complete a session to unlock targeted review guidance.");
+        }
+
+        if (HasFatiguePattern(_sessionNetWpmSamples, _lastCompletedEvents))
+        {
+            return ("Shorten the next run", "Your pace faded late while errors rose. Use a shorter paragraph or Zen Mode and stop before fatigue sets in.");
+        }
+
+        var costly = CostlyMistakeRows.FirstOrDefault();
+        if (costly is not null)
+        {
+            return ("Practice the costliest miss", $"Start with {costly.Label}; it cost the most combined accuracy and latency in this session.");
+        }
+
+        if (_lastSummary.Accuracy < _settings.GoalTargetAccuracyPercent / 100.0)
+        {
+            return ("Accuracy first", "Use Require Correct Key and Weak Keys until accuracy is back above target.");
+        }
+
+        return ("Build flow", "Run one short paragraph or retry the lowest WPM dip from the graph.");
+    }
+
+    private static bool HasFatiguePattern(
+        IReadOnlyList<SessionNetWpmSample> samples,
+        IReadOnlyList<TypingInputEvent> events)
+    {
+        var positiveSamples = samples.Where(sample => sample.NetWpm > 0).ToArray();
+        if (positiveSamples.Length < 6)
+        {
+            return false;
+        }
+
+        var split = positiveSamples.Length / 2;
+        var earlyWpm = positiveSamples.Take(split).Average(sample => sample.NetWpm);
+        var lateWpm = positiveSamples.Skip(split).Average(sample => sample.NetWpm);
+        var characterEvents = events
+            .Where(item => item.Kind == InputEventKind.Character)
+            .OrderBy(item => item.TimestampTicks)
+            .ToArray();
+        if (characterEvents.Length < 20)
+        {
+            return false;
+        }
+
+        var eventSplit = characterEvents.Length / 2;
+        var earlyErrorRate = characterEvents.Take(eventSplit).Count(item => !item.IsCorrect) / (double)eventSplit;
+        var lateEvents = characterEvents.Skip(eventSplit).ToArray();
+        var lateErrorRate = lateEvents.Count(item => !item.IsCorrect) / (double)Math.Max(1, lateEvents.Length);
+
+        return lateWpm < earlyWpm * 0.85 && lateErrorRate > earlyErrorRate + 0.04;
+    }
+
+    private static IReadOnlyList<CostlyMistakeRow> BuildCostlyMistakeRows(IReadOnlyList<TypingInputEvent> events)
+    {
+        var characterEvents = events
+            .Where(item => item.Kind == InputEventKind.Character && item.ExpectedChar is not null)
+            .ToArray();
+        if (characterEvents.Length == 0)
+        {
+            return Array.Empty<CostlyMistakeRow>();
+        }
+
+        var globalMedian = Median(characterEvents
+            .Select(item => item.DeltaFromPreviousMs)
+            .Where(value => value is >= 20 and <= 2000)
+            .Select(value => value!.Value));
+
+        return characterEvents
+            .GroupBy(item => item.ExpectedChar!.Value)
+            .Select(group =>
+            {
+                var samples = group.Count();
+                var correct = group.Count(item => item.IsCorrect);
+                var incorrect = samples - correct;
+                var latencies = group
+                    .Select(item => item.DeltaFromPreviousMs)
+                    .Where(value => value is >= 20 and <= 2000)
+                    .Select(value => value!.Value)
+                    .ToArray();
+                var median = Median(latencies);
+                var latencyCost = median is double medianValue && globalMedian is double globalValue
+                    ? Math.Max(0, medianValue - globalValue) / 100.0
+                    : 0;
+                var impact = incorrect * 10.0 + latencyCost + Math.Max(0, 1.0 - correct / (double)samples) * 10.0;
+
+                return new CostlyMistakeRow(
+                    DisplayChar(group.Key),
+                    FormatPercent(correct / (double)samples),
+                    FormatLatency(median),
+                    samples.ToString(CultureInfo.InvariantCulture),
+                    impact);
+            })
+            .Where(row => row.ImpactScore > 0)
+            .OrderByDescending(row => row.ImpactScore)
+            .ThenBy(row => row.Label, StringComparer.Ordinal)
+            .Take(6)
+            .ToArray();
+    }
+
+    private static string ExtractRetrySlice(string targetText, int cursorIndex, int targetLength)
+    {
+        if (string.IsNullOrWhiteSpace(targetText))
+        {
+            return string.Empty;
+        }
+
+        var center = Math.Clamp(cursorIndex, 0, targetText.Length - 1);
+        var start = Math.Max(0, center - targetLength / 2);
+        var end = Math.Min(targetText.Length, start + targetLength);
+        start = Math.Max(0, Math.Min(start, end - 1));
+
+        var leftBoundary = targetText.LastIndexOf(' ', start);
+        if (leftBoundary >= 0 && center - leftBoundary < targetLength)
+        {
+            start = leftBoundary + 1;
+        }
+
+        var rightBoundary = targetText.IndexOf(' ', Math.Min(end, targetText.Length - 1));
+        if (rightBoundary > start)
+        {
+            end = rightBoundary;
+        }
+
+        return targetText[start..end].Trim();
+    }
+
+    private static double? Median(IEnumerable<double> values)
+    {
+        var sorted = values.OrderBy(value => value).ToArray();
+        if (sorted.Length == 0)
+        {
+            return null;
+        }
+
+        var middle = sorted.Length / 2;
+        return sorted.Length % 2 == 1
+            ? sorted[middle]
+            : (sorted[middle - 1] + sorted[middle]) / 2.0;
     }
 
     private static IReadOnlyList<PracticeReviewRow> BuildReviewRows(SessionReview? review)
@@ -787,6 +1135,17 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         return value is null ? "-" : value.Value.ToString("0", CultureInfo.InvariantCulture);
     }
 
+    private static string DisplayChar(char character)
+    {
+        return character switch
+        {
+            ' ' => "Space",
+            '\n' or '\r' => "Enter",
+            '\t' => "Tab",
+            _ => character.ToString()
+        };
+    }
+
     private TypingSessionOptions CreateTypingSessionOptions()
     {
         return new TypingSessionOptions(
@@ -798,11 +1157,15 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     private void StopCurrentSession()
     {
+        _countdownTimer.Stop();
         _completionQueued = false;
+        _isCountdownActive = false;
         _lastSummary = null;
         _lastReview = null;
         _lastCompletedEvents = Array.Empty<TypingInputEvent>();
         _lastEscapeTimestampTicks = null;
+        _hasStartedTyping = false;
+        _countdownRemaining = 0;
         IsPaused = false;
         _isStopped = true;
         PauseStatus = "Session ended. Press any key to restart.";
@@ -845,6 +1208,27 @@ public sealed record PracticeReviewRow(
     string Samples,
     double WeaknessPercent);
 
+public sealed record CostlyMistakeRow(
+    string Label,
+    string Accuracy,
+    string MedianLatencyMs,
+    string Samples,
+    double ImpactScore)
+{
+    public string Impact => ImpactScore.ToString("0.0", CultureInfo.InvariantCulture);
+
+    public double ImpactPercent => Math.Clamp(ImpactScore, 0, 100);
+}
+
 public sealed record SessionNetWpmSample(
     double ElapsedMs,
-    double NetWpm);
+    double NetWpm,
+    int CursorIndex);
+
+public enum PracticeInputFeedback
+{
+    None,
+    Key,
+    Mistake,
+    CountdownStarted
+}

@@ -13,15 +13,12 @@
         PointerPressed="PracticeRoot_PointerPressed">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <controls:AppTopBar ActivePage="Practice" />
-
         <Grid
             x:Name="HeaderGrid"
-            Grid.Row="1"
+            Grid.Row="0"
             Margin="32,24,32,0"
             RowSpacing="12">
             <Grid.RowDefinitions>
@@ -63,6 +60,7 @@
                             <ComboBoxItem Content="Weak Keys" />
                             <ComboBoxItem Content="Weak Bigrams" />
                             <ComboBoxItem Content="Review" />
+                            <ComboBoxItem Content="Clipboard" />
                             <ComboBoxItem Content="Fixed" />
                         </ComboBox>
                     </StackPanel>
@@ -78,6 +76,7 @@
                             <ComboBoxItem Content="Long" />
                         </ComboBox>
                     </StackPanel>
+                    <Button Content="Clipboard" Click="ClipboardLessonButton_Click" />
                 </StackPanel>
             </Grid>
 
@@ -132,7 +131,7 @@
 
         <Grid
             x:Name="PracticeContentHost"
-            Grid.Row="2"
+            Grid.Row="1"
             Opacity="{Binding PracticeContentOpacity}">
         <StackPanel
             x:Name="PracticeContentPanel"
@@ -153,6 +152,7 @@
                 <StackPanel
                     x:Name="LeftStatsPanel"
                     Spacing="8"
+                    Visibility="{Binding PracticeStatsVisibility}"
                     VerticalAlignment="Top">
                     <Border x:Name="RawWpmTile" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
                         <StackPanel Spacing="2">
@@ -213,6 +213,15 @@
                                 Tapped="InputSurface_Tapped"
                                 State="{Binding CurrentState}" />
                         </ScrollViewer>
+                        <Border
+                            Padding="10,6"
+                            HorizontalAlignment="Left"
+                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Visibility="{Binding ReadyStatusVisibility}">
+                            <TextBlock Text="{Binding ReadyStatusText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Border>
                         <TextBlock
                             Text="{Binding TypingFeedback}"
                             Visibility="{Binding TypingFeedbackVisibility}"
@@ -256,6 +265,7 @@
                     x:Name="RightStatsPanel"
                     Grid.Column="2"
                     Spacing="8"
+                    Visibility="{Binding PracticeStatsVisibility}"
                     VerticalAlignment="Top">
                     <Border x:Name="ElapsedTile" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
                         <StackPanel Spacing="2">
@@ -291,7 +301,7 @@
 
         <Grid
             x:Name="ReviewOverlay"
-            Grid.RowSpan="3"
+            Grid.RowSpan="2"
             Background="#CC0A0F16"
             Visibility="{Binding ReviewPopupVisibility}">
             <Border
@@ -346,6 +356,7 @@
                                     Content="Practice These Mistakes"
                                     Click="PracticeMistakesButton_Click"
                                     Visibility="{Binding PracticeMistakesVisibility}" />
+                                <Button Content="Export Summary" Click="ExportSummaryButton_Click" />
                                 <Button Content="View Dashboard" Click="ViewDashboardButton_Click" />
                             </StackPanel>
                         </Grid>
@@ -388,6 +399,25 @@
                             BorderThickness="1"
                             BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                             CornerRadius="8">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{Binding ReviewRecommendationTitle}" FontSize="18" FontWeight="SemiBold" />
+                                <TextBlock
+                                    Text="{Binding ReviewRecommendationDetail}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    Text="{Binding ReviewRetryStatus}"
+                                    Visibility="{Binding ReviewRetryStatusVisibility}"
+                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            Padding="14"
+                            BorderThickness="1"
+                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                            CornerRadius="8">
                             <StackPanel Spacing="10">
                                 <Grid ColumnSpacing="14">
                                     <Grid.ColumnDefinitions>
@@ -412,7 +442,8 @@
                                     ValueSuffix=" WPM"
                                     ChartTitle="Net WPM over time"
                                     XAxisLabel="Time"
-                                    YAxisLabel="Net WPM" />
+                                    YAxisLabel="Net WPM"
+                                    PointSelected="SessionNetWpmChart_PointSelected" />
                             </StackPanel>
                         </Border>
 
@@ -429,6 +460,45 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Most costly mistakes" FontWeight="SemiBold" />
+                                <ListView ItemsSource="{Binding CostlyMistakeRows}" SelectionMode="None" MaxHeight="180">
+                                    <ListView.Header>
+                                        <Grid ColumnSpacing="10" Padding="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="110" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Target" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="1" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="2" Text="Median ms" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="3" Text="Samples" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="4" Text="Impact" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </Grid>
+                                    </ListView.Header>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnSpacing="10" Padding="0,7">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="100" />
+                                                    <ColumnDefinition Width="80" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Label}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Accuracy}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding MedianLatencyMs}" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Samples}" />
+                                                <ProgressBar Grid.Column="4" Maximum="100" Value="{Binding ImpactPercent}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
                             <ListView ItemsSource="{Binding ReviewRows}" SelectionMode="None" MaxHeight="280">
                                 <ListView.Header>
                                     <Grid ColumnSpacing="10" Padding="0,0,0,6">
