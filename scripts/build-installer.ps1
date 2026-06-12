@@ -57,6 +57,7 @@ $repoRoot = Get-FullPath (Join-Path $PSScriptRoot "..")
 $solutionPath = Join-Path $repoRoot "TypingTrainer.sln"
 $appProjectPath = Join-Path $repoRoot "src\TypingTrainer.App\TypingTrainer.App.csproj"
 $issPath = Join-Path $repoRoot "installer\TypingTrainer.iss"
+$appIconPath = Join-Path $repoRoot "src\TypingTrainer.App\Assets\AppIcon.ico"
 
 $artifactsRoot = Get-FullPath (Join-Path $repoRoot "artifacts")
 $publishRoot = Get-FullPath (Join-Path $artifactsRoot "publish")
@@ -65,7 +66,7 @@ $installerDir = Get-FullPath (Join-Path $artifactsRoot "installer")
 $appExePath = Join-Path $publishDir "TypingTrainer.App.exe"
 $installerPath = Join-Path $installerDir "TypingTrainerSetup.exe"
 
-foreach ($requiredPath in @($solutionPath, $appProjectPath, $issPath)) {
+foreach ($requiredPath in @($solutionPath, $appProjectPath, $issPath, $appIconPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required file was not found: $requiredPath"
     }
@@ -136,9 +137,11 @@ Write-Host "Using Inno Setup compiler: $isccPath"
 
 $publishDefine = '/DPublishDir="' + $publishDir + '"'
 $installerOutputDefine = '/DInstallerOutputDir="' + $installerDir + '"'
+$appIconDefine = '/DAppIconFile="' + $appIconPath + '"'
 $isccArgs = @(
     $publishDefine,
     $installerOutputDefine,
+    $appIconDefine,
     $issPath
 )
 Invoke-NativeCommand -FilePath $isccPath -Arguments $isccArgs -FailureMessage "Inno Setup compiler failed."

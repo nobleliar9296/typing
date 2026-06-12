@@ -11,6 +11,10 @@
   #define InstallerOutputDir "..\artifacts\installer"
 #endif
 
+#ifndef AppIconFile
+  #define AppIconFile "..\src\TypingTrainer.App\Assets\AppIcon.ico"
+#endif
+
 [Setup]
 AppId={{1DD7B52B-1D79-47F3-9D9F-F53A7E60B768}
 AppName={#AppName}
@@ -29,6 +33,7 @@ MinVersion=10.0.19041
 PrivilegesRequired=admin
 UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExeName}
+SetupIconFile={#AppIconFile}
 WizardStyle=modern
 CloseApplications=yes
 CloseApplicationsFilter={#AppExeName}

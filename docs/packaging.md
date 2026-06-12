@@ -45,10 +45,18 @@ The checked-in Inno Setup script can be regenerated with:
 powershell -ExecutionPolicy Bypass -File .\scripts\generate-installer-script.ps1
 ```
 
+## Regenerate App Icons
+
+The app icon PNGs and `Assets\AppIcon.ico` can be regenerated with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\generate-app-icons.ps1
+```
+
 ## Notes
 
 The script cleans only packaging artifacts under `artifacts\publish` and `artifacts\installer`. It does not remove source code or change app behavior.
 
-The installer uses `installer\TypingTrainer.iss` and targets x64 Windows. It installs to `{autopf}\Typing Trainer`, creates a Start Menu shortcut, offers an optional Desktop shortcut, registers an uninstall entry, and offers to launch Typing Trainer after installation.
+The installer uses `installer\TypingTrainer.iss` and targets x64 Windows. It installs to `{autopf}\Typing Trainer`, uses `Assets\AppIcon.ico` for the setup icon, creates a Start Menu shortcut, offers an optional Desktop shortcut, registers an uninstall entry, and offers to launch Typing Trainer after installation.
 
 When installing over an existing copy, the installer uses the same stable `AppId`, asks Windows to close `TypingTrainer.App.exe` if it is running, cleans the old files under `{app}`, and then copies the newly published folder. This keeps stale DLLs or removed dependency folders from lingering between releases.
