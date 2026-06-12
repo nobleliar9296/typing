@@ -16,6 +16,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     private readonly IContentQueryService _contentQueryService;
     private readonly IJsonExportService _jsonExportService;
     private readonly IPracticeSessionRepository _practiceSessionRepository;
+    private readonly ILocalDataBackupService _localDataBackupService;
     private CancellationTokenSource? _importCancellation;
     private AppSettings _settings = AppSettings.Defaults;
     private IReadOnlyList<ContentPackRow> _contentPacks = Array.Empty<ContentPackRow>();
@@ -28,6 +29,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     private bool _hasLoadedSettings;
     private CancellationTokenSource? _settingsAutosaveCancellation;
     private string _settingsStatus = string.Empty;
+    private string _selectedContentPackName = string.Empty;
+    private bool _selectedContentPackEnabled;
+    private IReadOnlyList<ContentPreviewRow> _contentPreviewRows = Array.Empty<ContentPreviewRow>();
+    private string _backupPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "TypingTrainer",
+        "typingtrainer-backup.db");
     private string _exportPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "TypingTrainer",
@@ -38,13 +46,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         ITextFileImportService textFileImportService,
         IContentQueryService contentQueryService,
         IJsonExportService jsonExportService,
-        IPracticeSessionRepository practiceSessionRepository)
+        IPracticeSessionRepository practiceSessionRepository,
+        ILocalDataBackupService localDataBackupService)
     {
         _settingsRepository = settingsRepository;
         _textFileImportService = textFileImportService;
         _contentQueryService = contentQueryService;
         _jsonExportService = jsonExportService;
         _practiceSessionRepository = practiceSessionRepository;
+        _localDataBackupService = localDataBackupService;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -149,6 +159,48 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public string VisualKeyboardScaleText => $"{VisualKeyboardScalePercent}%";
 
+    public string GoalTrainingFocus
+    {
+        get => _settings.GoalTrainingFocus;
+        set => UpdateSettings(_settings with { GoalTrainingFocus = value });
+    }
+
+    public int GoalTargetSessionMinutes
+    {
+        get => _settings.GoalTargetSessionMinutes;
+        set => UpdateSettings(_settings with { GoalTargetSessionMinutes = Math.Clamp(value, 5, 60) });
+    }
+
+    public int GoalTargetEssayWords
+    {
+        get => _settings.GoalTargetEssayWords;
+        set => UpdateSettings(_settings with { GoalTargetEssayWords = Math.Clamp(value, 100, 3000) });
+    }
+
+    public string PracticeFontFamily
+    {
+        get => _settings.PracticeFontFamily;
+        set => UpdateSettings(_settings with { PracticeFontFamily = value });
+    }
+
+    public string PracticeLineWidth
+    {
+        get => _settings.PracticeLineWidth;
+        set => UpdateSettings(_settings with { PracticeLineWidth = value });
+    }
+
+    public string PracticeTextContrast
+    {
+        get => _settings.PracticeTextContrast;
+        set => UpdateSettings(_settings with { PracticeTextContrast = value });
+    }
+
+    public string PracticeCursorStyle
+    {
+        get => _settings.PracticeCursorStyle;
+        set => UpdateSettings(_settings with { PracticeCursorStyle = value });
+    }
+
     public bool NormalizeImportedTextToAscii
     {
         get => _settings.NormalizeImportedTextToAscii;
@@ -233,7 +285,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             pack.Name,
             pack.SourceFileName ?? "-",
             pack.ParagraphCount.ToString(CultureInfo.InvariantCulture),
-            pack.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy", CultureInfo.InvariantCulture)))
+            pack.FileSizeBytes is long bytes ? FormatFileSize(bytes) : "-",
+            pack.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            pack.Enabled ? "Enabled" : "Disabled"))
         .ToArray();
 
     public IReadOnlyList<ContentPackRow> ContentPacks
@@ -255,8 +309,48 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             if (!Equals(_selectedContentPack, value))
             {
                 _selectedContentPack = value;
+                _selectedContentPackName = value?.Name ?? string.Empty;
+                _selectedContentPackEnabled = value?.Enabled ?? false;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectedContentPackName));
+                OnPropertyChanged(nameof(SelectedContentPackEnabled));
+            }
+        }
+    }
+
+    public string SelectedContentPackName
+    {
+        get => _selectedContentPackName;
+        set
+        {
+            if (_selectedContentPackName != value)
+            {
+                _selectedContentPackName = value;
                 OnPropertyChanged();
             }
+        }
+    }
+
+    public bool SelectedContentPackEnabled
+    {
+        get => _selectedContentPackEnabled;
+        set
+        {
+            if (_selectedContentPackEnabled != value)
+            {
+                _selectedContentPackEnabled = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public IReadOnlyList<ContentPreviewRow> ContentPreviewRows
+    {
+        get => _contentPreviewRows;
+        private set
+        {
+            _contentPreviewRows = value;
+            OnPropertyChanged();
         }
     }
 
@@ -281,6 +375,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             if (_exportPath != value)
             {
                 _exportPath = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public string BackupPath
+    {
+        get => _backupPath;
+        set
+        {
+            if (_backupPath != value)
+            {
+                _backupPath = value;
                 OnPropertyChanged();
             }
         }
@@ -380,8 +487,36 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
         await _contentQueryService.DeleteContentPackAsync(SelectedContentPack.Id, cancellationToken);
         SelectedContentPack = null;
+        ContentPreviewRows = Array.Empty<ContentPreviewRow>();
         await RefreshContentPacksAsync(cancellationToken);
         SettingsStatus = "Content pack deleted.";
+    }
+
+    public async Task SaveSelectedPackAsync(CancellationToken cancellationToken = default)
+    {
+        if (SelectedContentPack is null)
+        {
+            return;
+        }
+
+        await _contentQueryService.RenameContentPackAsync(SelectedContentPack.Id, SelectedContentPackName, cancellationToken);
+        await _contentQueryService.SetContentPackEnabledAsync(SelectedContentPack.Id, SelectedContentPackEnabled, cancellationToken);
+        await RefreshContentPacksAsync(cancellationToken);
+        SettingsStatus = "Content pack updated.";
+    }
+
+    public async Task PreviewSelectedPackAsync(CancellationToken cancellationToken = default)
+    {
+        if (SelectedContentPack is null)
+        {
+            ContentPreviewRows = Array.Empty<ContentPreviewRow>();
+            return;
+        }
+
+        var preview = await _contentQueryService.GetContentPackPreviewAsync(SelectedContentPack.Id, 5, cancellationToken);
+        ContentPreviewRows = preview
+            .Select(item => new ContentPreviewRow(item.Title, item.Text))
+            .ToArray();
     }
 
     public async Task ExportSessionsAsync(CancellationToken cancellationToken = default)
@@ -394,6 +529,18 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     {
         await _practiceSessionRepository.DeleteAllAsync(cancellationToken);
         SettingsStatus = "Practice history deleted.";
+    }
+
+    public async Task BackupDatabaseAsync(CancellationToken cancellationToken = default)
+    {
+        await _localDataBackupService.BackupAsync(BackupPath, cancellationToken);
+        SettingsStatus = "Database backup saved.";
+    }
+
+    public async Task RestoreDatabaseAsync(CancellationToken cancellationToken = default)
+    {
+        await _localDataBackupService.RestoreAsync(BackupPath, cancellationToken);
+        SettingsStatus = "Database restored. Restart the app to reload all services.";
     }
 
     private void UpdateSettings(AppSettings settings)
@@ -428,9 +575,25 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(VisualKeyboardScalePercent));
         OnPropertyChanged(nameof(PracticeTextScaleText));
         OnPropertyChanged(nameof(VisualKeyboardScaleText));
+        OnPropertyChanged(nameof(GoalTrainingFocus));
+        OnPropertyChanged(nameof(GoalTargetSessionMinutes));
+        OnPropertyChanged(nameof(GoalTargetEssayWords));
+        OnPropertyChanged(nameof(PracticeFontFamily));
+        OnPropertyChanged(nameof(PracticeLineWidth));
+        OnPropertyChanged(nameof(PracticeTextContrast));
+        OnPropertyChanged(nameof(PracticeCursorStyle));
         OnPropertyChanged(nameof(NormalizeImportedTextToAscii));
         OnPropertyChanged(nameof(LowercaseImportedText));
         OnPropertyChanged(nameof(NormalizeImportedWhitespace));
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        return bytes >= 1024 * 1024
+            ? $"{bytes / (1024.0 * 1024.0):0.0} MB"
+            : bytes >= 1024
+                ? $"{bytes / 1024.0:0.0} KB"
+                : $"{bytes} B";
     }
 
     private void QueueSettingsAutosave()
@@ -493,4 +656,10 @@ public sealed record ContentPackDisplayRow(
     string Name,
     string SourceFileName,
     string ParagraphCount,
-    string CreatedAt);
+    string FileSize,
+    string CreatedAt,
+    string Enabled);
+
+public sealed record ContentPreviewRow(
+    string Title,
+    string Text);

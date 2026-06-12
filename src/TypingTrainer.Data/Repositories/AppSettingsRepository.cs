@@ -49,7 +49,14 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             GetClampedInt(values, "goals.weeklyPracticeMinutes", defaults.GoalWeeklyPracticeMinutes, 0, 10_080),
             GetBool(values, "content.normalizeImportedTextToAscii", defaults.NormalizeImportedTextToAscii),
             GetBool(values, "content.lowercaseImportedText", defaults.LowercaseImportedText),
-            GetBool(values, "content.normalizeWhitespace", defaults.NormalizeImportedWhitespace));
+            GetBool(values, "content.normalizeWhitespace", defaults.NormalizeImportedWhitespace),
+            GetString(values, "goals.trainingFocus", defaults.GoalTrainingFocus),
+            GetClampedInt(values, "goals.targetSessionMinutes", defaults.GoalTargetSessionMinutes, 5, 60),
+            GetClampedInt(values, "goals.targetEssayWords", defaults.GoalTargetEssayWords, 100, 3000),
+            GetString(values, "practice.fontFamily", defaults.PracticeFontFamily),
+            GetString(values, "practice.lineWidth", defaults.PracticeLineWidth),
+            GetString(values, "practice.textContrast", defaults.PracticeTextContrast),
+            GetString(values, "practice.cursorStyle", defaults.PracticeCursorStyle));
     }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -79,6 +86,13 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         await UpsertAsync(connection, (SqliteTransaction)transaction, "content.normalizeImportedTextToAscii", Bool(settings.NormalizeImportedTextToAscii), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "content.lowercaseImportedText", Bool(settings.LowercaseImportedText), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "content.normalizeWhitespace", Bool(settings.NormalizeImportedWhitespace), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.trainingFocus", settings.GoalTrainingFocus, cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetSessionMinutes", settings.GoalTargetSessionMinutes.ToString(), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetEssayWords", settings.GoalTargetEssayWords.ToString(), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.fontFamily", settings.PracticeFontFamily, cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.lineWidth", settings.PracticeLineWidth, cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.textContrast", settings.PracticeTextContrast, cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.cursorStyle", settings.PracticeCursorStyle, cancellationToken).ConfigureAwait(false);
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }

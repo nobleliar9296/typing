@@ -62,6 +62,9 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="180" />
@@ -105,6 +108,34 @@
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                         TextWrapping="Wrap" />
                                 </StackPanel>
+
+                                <TextBlock Grid.Row="5" Text="Training focus" VerticalAlignment="Center" />
+                                <TextBox
+                                    Grid.Row="5"
+                                    Grid.Column="1"
+                                    Width="180"
+                                    HorizontalAlignment="Left"
+                                    Text="{Binding GoalTrainingFocus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock Grid.Row="6" Text="Session minutes" VerticalAlignment="Center" />
+                                <NumberBox
+                                    Grid.Row="6"
+                                    Grid.Column="1"
+                                    Width="120"
+                                    HorizontalAlignment="Left"
+                                    Minimum="5"
+                                    Maximum="60"
+                                    Value="{Binding GoalTargetSessionMinutes, Mode=TwoWay}" />
+
+                                <TextBlock Grid.Row="7" Text="Essay words" VerticalAlignment="Center" />
+                                <NumberBox
+                                    Grid.Row="7"
+                                    Grid.Column="1"
+                                    Width="120"
+                                    HorizontalAlignment="Left"
+                                    Minimum="100"
+                                    Maximum="3000"
+                                    Value="{Binding GoalTargetEssayWords, Mode=TwoWay}" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -118,6 +149,9 @@
 
                             <Grid ColumnSpacing="12" RowSpacing="12">
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
@@ -144,6 +178,18 @@
                                 <StackPanel Grid.Row="3" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="18">
                                     <CheckBox Content="Show finger colors" IsChecked="{Binding ShowFingerColors, Mode=TwoWay}" />
                                     <CheckBox Content="Show finger labels" IsChecked="{Binding ShowFingerLabels, Mode=TwoWay}" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="4" Text="Font" VerticalAlignment="Center" />
+                                <TextBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding PracticeFontFamily, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock Grid.Row="5" Text="Line width" VerticalAlignment="Center" />
+                                <TextBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding PracticeLineWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock Grid.Row="6" Text="Contrast / cursor" VerticalAlignment="Center" />
+                                <StackPanel Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="8">
+                                    <TextBox Width="140" Text="{Binding PracticeTextContrast, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox Width="140" Text="{Binding PracticeCursorStyle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
@@ -199,21 +245,51 @@
                                     TextWrapping="Wrap" />
                             </StackPanel>
 
+                            <Grid ColumnSpacing="8" RowSpacing="8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Header="Selected pack name" Text="{Binding SelectedContentPackName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <CheckBox Grid.Column="1" Content="Enabled" VerticalAlignment="Bottom" IsChecked="{Binding SelectedContentPackEnabled, Mode=TwoWay}" />
+                                <Button Grid.Column="2" Content="Save Pack" VerticalAlignment="Bottom" Click="SavePackButton_Click" />
+                                <Button Grid.Row="1" Content="Preview Selected Pack" HorizontalAlignment="Left" Click="PreviewPackButton_Click" />
+                            </Grid>
+
                             <ListView x:Name="ContentPacksListView" ItemsSource="{Binding ContentPackRows}" SelectionMode="Single" SelectionChanged="ContentPacksListView_SelectionChanged" MaxHeight="260">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="12" Padding="0,8">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="240" />
-                                                <ColumnDefinition Width="180" />
-                                                <ColumnDefinition Width="90" />
-                                                <ColumnDefinition Width="120" />
+                                                <ColumnDefinition Width="190" />
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="70" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="80" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="1" Text="{Binding SourceFileName}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="{Binding ParagraphCount}" />
-                                            <TextBlock Grid.Column="3" Text="{Binding CreatedAt}" />
+                                            <TextBlock Grid.Column="3" Text="{Binding FileSize}" />
+                                            <TextBlock Grid.Column="4" Text="{Binding CreatedAt}" />
+                                            <TextBlock Grid.Column="5" Text="{Binding Enabled}" />
                                         </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <ListView ItemsSource="{Binding ContentPreviewRows}" SelectionMode="None" MaxHeight="180">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Padding="0,6">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxLines="3" />
+                                        </StackPanel>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
@@ -231,6 +307,11 @@
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button Content="Export Sessions JSON" Click="ExportSessionsButton_Click" />
                                 <Button Content="Delete Practice History" Click="DeleteHistoryButton_Click" />
+                            </StackPanel>
+                            <TextBox Header="Database backup / restore path" Text="{Binding BackupPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Backup Database" Click="BackupDatabaseButton_Click" />
+                                <Button Content="Restore Database" Click="RestoreDatabaseButton_Click" />
                             </StackPanel>
                             <TextBox Header="Keyboard layout" Width="180" HorizontalAlignment="Left" IsReadOnly="True" IsEnabled="False" Text="{Binding VisualKeyboardLayout}" />
                         </StackPanel>

@@ -255,6 +255,7 @@ public sealed partial class PracticePage : Page
         InputBorder.Padding = new Thickness(Math.Clamp(32 * scale, 16, 32));
         InputBorder.MaxWidth = width < 1200 ? double.PositiveInfinity : 1100;
         PracticeTextPresenter.DisplayScale = scale * ViewModel.PracticeTextScale;
+        PracticeTextPresenter.MaxWidth = ViewModel.PracticeLineWidthMax;
         VisualKeyboard.KeyboardScale = keyboardScale * ViewModel.VisualKeyboardScale;
         VisualKeyboard.MaxWidth = width < 900 ? double.PositiveInfinity : 1280;
 

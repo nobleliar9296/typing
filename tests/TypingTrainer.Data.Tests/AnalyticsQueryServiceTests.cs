@@ -143,6 +143,41 @@ public sealed class AnalyticsQueryServiceTests
     }
 
     [TestMethod]
+    public async Task KeyboardHeatmapQueryService_CalculatesKeyWeakness()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        var session = CreateSession(startedAtUtc: NowUtc.AddHours(-1), targetText: "ab");
+        await database.SaveAsync(session,
+        [
+            CharacterEvent(session.Id, 0, 'a', 'x', false, 100, 1),
+            CharacterEvent(session.Id, 1, 'b', 'b', true, 120, 2)
+        ]);
+
+        var rows = await database.Heatmap.GetHeatmapAsync(AnalyticsRange.AllTime);
+
+        var a = rows.Single(row => row.Character == 'a');
+        Assert.AreEqual(1, a.ExposureCount);
+        Assert.AreEqual(0, a.Accuracy);
+    }
+
+    [TestMethod]
+    public async Task SessionDetailQueryService_ReturnsTimelineMistakesAndSlowTransitions()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        var session = CreateSession(startedAtUtc: NowUtc.AddHours(-1), targetText: "the");
+        await database.SaveAsync(session, CreateTheEvents(session.Id));
+
+        var detail = await database.SessionDetail.GetSessionDetailAsync(session.Id);
+
+        Assert.IsNotNull(detail);
+        Assert.AreEqual(session.Id, detail.Session.Id);
+        Assert.IsTrue(detail.Events.Count > 0);
+        Assert.IsTrue(detail.Timeline.Count > 0);
+        Assert.IsTrue(detail.Mistakes.Count > 0);
+        Assert.IsTrue(detail.SlowestBigrams.Count > 0);
+    }
+
+    [TestMethod]
     public async Task AnalyticsQueryService_GetDashboardSnapshot_CalculatesCharacterLatency()
     {
         await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
@@ -321,12 +356,15 @@ public sealed class AnalyticsQueryServiceTests
     {
         private AnalyticsTestDatabase(
             string directoryPath,
+            SqliteConnectionFactory connectionFactory,
             PracticeSessionRepository repository,
             AnalyticsQueryService analytics)
         {
             DirectoryPath = directoryPath;
             Repository = repository;
             Analytics = analytics;
+            Heatmap = new KeyboardHeatmapQueryService(connectionFactory);
+            SessionDetail = new SessionDetailQueryService(repository);
         }
 
         public string DirectoryPath { get; }
@@ -334,6 +372,10 @@ public sealed class AnalyticsQueryServiceTests
         public PracticeSessionRepository Repository { get; }
 
         public AnalyticsQueryService Analytics { get; }
+
+        public KeyboardHeatmapQueryService Heatmap { get; }
+
+        public SessionDetailQueryService SessionDetail { get; }
 
         public static async Task<AnalyticsTestDatabase> CreateInitializedAsync(
             DateTimeOffset nowUtc,
@@ -352,7 +394,7 @@ public sealed class AnalyticsQueryServiceTests
                 new FixedUtcClock(nowUtc),
                 localTimeZone ?? TimeZoneInfo.Utc);
 
-            return new AnalyticsTestDatabase(directoryPath, repository, analytics);
+            return new AnalyticsTestDatabase(directoryPath, connectionFactory, repository, analytics);
         }
 
         public Task SaveAsync(StoredPracticeSession session)

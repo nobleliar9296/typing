@@ -14,9 +14,12 @@ public sealed class AppServices
         IPracticeSessionRepository practiceSessionRepository,
         IJsonExportService jsonExportService,
         IAnalyticsQueryService analyticsQueryService,
+        IKeyboardHeatmapQueryService keyboardHeatmapQueryService,
+        ISessionDetailQueryService sessionDetailQueryService,
         ISkillProfileQueryService skillProfileQueryService,
         IContentQueryService contentQueryService,
         ITextFileImportService textFileImportService,
+        ILocalDataBackupService localDataBackupService,
         IAppSettingsRepository appSettingsRepository,
         ILessonService lessonService,
         ISessionPersistenceQueue sessionPersistenceQueue)
@@ -24,9 +27,12 @@ public sealed class AppServices
         PracticeSessionRepository = practiceSessionRepository;
         JsonExportService = jsonExportService;
         AnalyticsQueryService = analyticsQueryService;
+        KeyboardHeatmapQueryService = keyboardHeatmapQueryService;
+        SessionDetailQueryService = sessionDetailQueryService;
         SkillProfileQueryService = skillProfileQueryService;
         ContentQueryService = contentQueryService;
         TextFileImportService = textFileImportService;
+        LocalDataBackupService = localDataBackupService;
         AppSettingsRepository = appSettingsRepository;
         LessonService = lessonService;
         SessionPersistenceQueue = sessionPersistenceQueue;
@@ -38,11 +44,17 @@ public sealed class AppServices
 
     public IAnalyticsQueryService AnalyticsQueryService { get; }
 
+    public IKeyboardHeatmapQueryService KeyboardHeatmapQueryService { get; }
+
+    public ISessionDetailQueryService SessionDetailQueryService { get; }
+
     public ISkillProfileQueryService SkillProfileQueryService { get; }
 
     public IContentQueryService ContentQueryService { get; }
 
     public ITextFileImportService TextFileImportService { get; }
+
+    public ILocalDataBackupService LocalDataBackupService { get; }
 
     public IAppSettingsRepository AppSettingsRepository { get; }
 
@@ -62,6 +74,9 @@ public sealed class AppServices
         var appSettingsRepository = new AppSettingsRepository(connectionFactory);
         var jsonExportService = new JsonExportService(practiceSessionRepository);
         var analyticsQueryService = new AnalyticsQueryService(connectionFactory);
+        var keyboardHeatmapQueryService = new KeyboardHeatmapQueryService(connectionFactory);
+        var sessionDetailQueryService = new SessionDetailQueryService(practiceSessionRepository);
+        var localDataBackupService = new LocalDataBackupService(databasePath);
         var skillProfileQueryService = new SkillProfileQueryService(connectionFactory);
         var wordListProvider = new BuiltInWordListProvider();
         var paragraphProvider = new BuiltInParagraphProvider();
@@ -88,9 +103,12 @@ public sealed class AppServices
             practiceSessionRepository,
             jsonExportService,
             analyticsQueryService,
+            keyboardHeatmapQueryService,
+            sessionDetailQueryService,
             skillProfileQueryService,
             contentQueryService,
             textFileImportService,
+            localDataBackupService,
             appSettingsRepository,
             lessonService,
             sessionPersistenceQueue);

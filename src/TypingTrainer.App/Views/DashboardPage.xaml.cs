@@ -14,6 +14,7 @@ public sealed partial class DashboardPage : Page
         InitializeComponent();
         ViewModel = new DashboardViewModel(
             App.Services.AnalyticsQueryService,
+            App.Services.KeyboardHeatmapQueryService,
             App.Services.AppSettingsRepository);
         DataContext = ViewModel;
     }
@@ -62,5 +63,18 @@ public sealed partial class DashboardPage : Page
         }
 
         await ViewModel.LoadAsync();
+    }
+
+    private void RecentSessionsListView_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is RecentSessionDisplayRow row)
+        {
+            Frame.Navigate(typeof(SessionDetailPage), row.SessionId);
+        }
+    }
+
+    private void StartDailyPlanButton_Click(object sender, RoutedEventArgs e)
+    {
+        Frame.Navigate(typeof(PracticePage));
     }
 }

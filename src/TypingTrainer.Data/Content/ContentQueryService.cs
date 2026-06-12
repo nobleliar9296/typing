@@ -77,6 +77,68 @@ public sealed class ContentQueryService : IContentQueryService
         return packs;
     }
 
+    public async Task<IReadOnlyList<PracticeContentItem>> GetContentPackPreviewAsync(
+        Guid packId,
+        int limit = 5,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT item.id, item.pack_id, item.kind, item.title, item.text, item.language, item.source,
+                   item.character_count, item.word_count, item.character_set,
+                   item.contains_capital_letters, item.contains_numbers, item.contains_punctuation,
+                   item.average_word_length, item.difficulty_score, item.created_at_utc,
+                   item.last_used_at_utc, item.use_count
+            FROM practice_content_items item
+            WHERE item.pack_id = $packId
+            ORDER BY item.created_at_utc ASC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$packId", packId.ToString());
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 20));
+
+        var items = new List<PracticeContentItem>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            items.Add(ReadContentItem(reader));
+        }
+
+        return items;
+    }
+
+    public async Task RenameContentPackAsync(
+        Guid packId,
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Content pack name is required.", nameof(name));
+        }
+
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE content_packs SET name = $name WHERE id = $packId;";
+        command.Parameters.AddWithValue("$name", name.Trim());
+        command.Parameters.AddWithValue("$packId", packId.ToString());
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task SetContentPackEnabledAsync(
+        Guid packId,
+        bool enabled,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE content_packs SET enabled = $enabled WHERE id = $packId;";
+        command.Parameters.AddWithValue("$enabled", enabled ? 1 : 0);
+        command.Parameters.AddWithValue("$packId", packId.ToString());
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<bool> HasEnabledImportedContentAsync(
         CancellationToken cancellationToken = default)
     {

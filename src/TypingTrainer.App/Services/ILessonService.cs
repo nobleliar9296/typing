@@ -1,5 +1,6 @@
 using TypingTrainer.Core.Lessons;
 using TypingTrainer.Core.Review;
+using TypingTrainer.Core.Typing;
 using TypingTrainer.Data.Models;
 
 namespace TypingTrainer.App.Services;
@@ -17,6 +18,12 @@ public interface ILessonService
 
     Task<LessonGenerationResult> GenerateReviewLessonAsync(
         SessionReview review,
+        int targetCharacters,
+        CancellationToken cancellationToken = default);
+
+    Task<LessonGenerationResult> GenerateMistakeReplayLessonAsync(
+        SessionReview review,
+        IReadOnlyList<TypingInputEvent> events,
         int targetCharacters,
         CancellationToken cancellationToken = default);
 }

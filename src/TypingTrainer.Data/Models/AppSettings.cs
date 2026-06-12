@@ -22,10 +22,22 @@ public sealed record AppSettings(
     int GoalWeeklyPracticeMinutes,
     bool NormalizeImportedTextToAscii,
     bool LowercaseImportedText,
-    bool NormalizeImportedWhitespace)
+    bool NormalizeImportedWhitespace,
+    string GoalTrainingFocus,
+    int GoalTargetSessionMinutes,
+    int GoalTargetEssayWords,
+    string PracticeFontFamily,
+    string PracticeLineWidth,
+    string PracticeTextContrast,
+    string PracticeCursorStyle)
 {
     public const string AutoLessonMode = "Auto";
     public const string QwertyKeyboardLayout = "QWERTY";
+    public const string DefaultTrainingFocus = "Balanced";
+    public const string DefaultFontFamily = "Cascadia Mono";
+    public const string DefaultLineWidth = "Comfortable";
+    public const string DefaultTextContrast = "Normal";
+    public const string DefaultCursorStyle = "Underline";
 
     public static AppSettings Defaults { get; } = new(
         AutoLessonMode,
@@ -49,5 +61,12 @@ public sealed record AppSettings(
         GoalWeeklyPracticeMinutes: 75,
         NormalizeImportedTextToAscii: true,
         LowercaseImportedText: false,
-        NormalizeImportedWhitespace: true);
+        NormalizeImportedWhitespace: true,
+        GoalTrainingFocus: DefaultTrainingFocus,
+        GoalTargetSessionMinutes: 15,
+        GoalTargetEssayWords: 1000,
+        PracticeFontFamily: DefaultFontFamily,
+        PracticeLineWidth: DefaultLineWidth,
+        PracticeTextContrast: DefaultTextContrast,
+        PracticeCursorStyle: DefaultCursorStyle);
 }

@@ -19,7 +19,8 @@ public sealed partial class SettingsPage : Page
             App.Services.TextFileImportService,
             App.Services.ContentQueryService,
             App.Services.JsonExportService,
-            App.Services.PracticeSessionRepository);
+            App.Services.PracticeSessionRepository,
+            App.Services.LocalDataBackupService);
         DataContext = ViewModel;
     }
 
@@ -105,6 +106,16 @@ public sealed partial class SettingsPage : Page
         await ViewModel.DeleteSelectedPackAsync();
     }
 
+    private async void SavePackButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.SaveSelectedPackAsync();
+    }
+
+    private async void PreviewPackButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.PreviewSelectedPackAsync();
+    }
+
     private async void ExportSessionsButton_Click(object sender, RoutedEventArgs e)
     {
         await ViewModel.ExportSessionsAsync();
@@ -113,6 +124,18 @@ public sealed partial class SettingsPage : Page
     private async void DeleteHistoryButton_Click(object sender, RoutedEventArgs e)
     {
         await ViewModel.DeletePracticeHistoryAsync();
+    }
+
+    private async void BackupDatabaseButton_Click(object sender, RoutedEventArgs e)
+    {
+        await App.Services.SessionPersistenceQueue.FlushAsync();
+        await ViewModel.BackupDatabaseAsync();
+    }
+
+    private async void RestoreDatabaseButton_Click(object sender, RoutedEventArgs e)
+    {
+        await App.Services.SessionPersistenceQueue.FlushAsync();
+        await ViewModel.RestoreDatabaseAsync();
     }
 
 }

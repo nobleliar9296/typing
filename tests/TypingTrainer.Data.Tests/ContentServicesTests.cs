@@ -5,6 +5,7 @@ using TypingTrainer.Data.Content;
 using TypingTrainer.Data.Database;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Data.Repositories;
+using TypingTrainer.Data.Services;
 
 namespace TypingTrainer.Data.Tests;
 
@@ -196,6 +197,50 @@ public sealed class ContentServicesTests
     }
 
     [TestMethod]
+    public async Task ContentQueryService_RenameAndEnableContentPack_Persists()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var filePath = database.CreateTextFile("rename.txt", "this paragraph has enough text for import and rename testing");
+        await database.ImportService.ImportTextFileAsync(filePath, new TextImportOptions("Original", MinParagraphCharacters: 20));
+        var pack = (await database.ContentQuery.GetContentPacksAsync()).Single();
+
+        await database.ContentQuery.RenameContentPackAsync(pack.Id, "Renamed");
+        await database.ContentQuery.SetContentPackEnabledAsync(pack.Id, false);
+
+        var updated = (await database.ContentQuery.GetContentPacksAsync()).Single();
+        Assert.AreEqual("Renamed", updated.Name);
+        Assert.IsFalse(updated.Enabled);
+    }
+
+    [TestMethod]
+    public async Task ContentQueryService_DisabledPack_IsNotSelectedForPractice()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var filePath = database.CreateTextFile("disabled.txt", "this paragraph has enough text for import and disable testing");
+        await database.ImportService.ImportTextFileAsync(filePath, new TextImportOptions("Disabled", MinParagraphCharacters: 20));
+        var pack = (await database.ContentQuery.GetContentPacksAsync()).Single();
+
+        await database.ContentQuery.SetContentPackEnabledAsync(pack.Id, false);
+        var paragraph = await database.ContentQuery.GetNextParagraphAsync(new ParagraphPracticeQuery(80, true, true, true, true, false));
+
+        Assert.IsNull(paragraph);
+    }
+
+    [TestMethod]
+    public async Task ContentQueryService_ContentPackPreview_ReturnsParagraphs()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var filePath = database.CreateTextFile("preview.txt", "this paragraph has enough text for import and preview testing");
+        await database.ImportService.ImportTextFileAsync(filePath, new TextImportOptions("Preview", MinParagraphCharacters: 20));
+        var pack = (await database.ContentQuery.GetContentPacksAsync()).Single();
+
+        var preview = await database.ContentQuery.GetContentPackPreviewAsync(pack.Id, 5);
+
+        Assert.AreEqual(1, preview.Count);
+        StringAssert.Contains(preview[0].Text, "preview");
+    }
+
+    [TestMethod]
     public async Task AppSettingsRepository_ReturnsDefaultsWhenEmpty()
     {
         await using var database = await ContentTestDatabase.CreateInitializedAsync();
@@ -218,6 +263,10 @@ public sealed class ContentServicesTests
         Assert.IsTrue(settings.NormalizeImportedTextToAscii);
         Assert.IsFalse(settings.LowercaseImportedText);
         Assert.IsTrue(settings.NormalizeImportedWhitespace);
+        Assert.AreEqual(AppSettings.DefaultTrainingFocus, settings.GoalTrainingFocus);
+        Assert.AreEqual(15, settings.GoalTargetSessionMinutes);
+        Assert.AreEqual(1000, settings.GoalTargetEssayWords);
+        Assert.AreEqual(AppSettings.DefaultFontFamily, settings.PracticeFontFamily);
     }
 
     [TestMethod]
@@ -408,6 +457,64 @@ public sealed class ContentServicesTests
     }
 
     [TestMethod]
+    public async Task AppSettingsRepository_SaveTrainingAndReadabilitySettings_Persists()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+
+        await database.SettingsRepository.SaveSettingsAsync(AppSettings.Defaults with
+        {
+            GoalTrainingFocus = "Speed",
+            GoalTargetSessionMinutes = 25,
+            GoalTargetEssayWords = 1500,
+            PracticeFontFamily = "Consolas",
+            PracticeLineWidth = "Wide",
+            PracticeTextContrast = "High",
+            PracticeCursorStyle = "Bold"
+        });
+        var settings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual("Speed", settings.GoalTrainingFocus);
+        Assert.AreEqual(25, settings.GoalTargetSessionMinutes);
+        Assert.AreEqual(1500, settings.GoalTargetEssayWords);
+        Assert.AreEqual("Consolas", settings.PracticeFontFamily);
+        Assert.AreEqual("Wide", settings.PracticeLineWidth);
+        Assert.AreEqual("High", settings.PracticeTextContrast);
+        Assert.AreEqual("Bold", settings.PracticeCursorStyle);
+    }
+
+    [TestMethod]
+    public async Task LocalDataBackupService_BackupCreatesValidDatabaseCopy()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var backupPath = Path.Combine(database.DirectoryPath, "backup.db");
+
+        await database.BackupService.BackupAsync(backupPath);
+
+        Assert.IsTrue(File.Exists(backupPath));
+    }
+
+    [TestMethod]
+    public async Task LocalDataBackupService_RestoreRejectsInvalidDatabase()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var invalidPath = database.CreateTextFile("invalid.db", "not sqlite");
+
+        await Assert.ThrowsExceptionAsync<SqliteException>(() => database.BackupService.RestoreAsync(invalidPath));
+    }
+
+    [TestMethod]
+    public async Task LocalDataBackupService_RestoreAcceptsValidBackup()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var backupPath = Path.Combine(database.DirectoryPath, "valid-backup.db");
+        await database.BackupService.BackupAsync(backupPath);
+
+        await database.BackupService.RestoreAsync(backupPath);
+
+        Assert.IsTrue(File.Exists(database.DatabasePath));
+    }
+
+    [TestMethod]
     public void TextFileImportService_Source_DoesNotUseWholeFileReads()
     {
         var sourcePath = Path.Combine(
@@ -438,14 +545,18 @@ public sealed class ContentServicesTests
         private ContentTestDatabase(string directoryPath, SqliteConnectionFactory connectionFactory)
         {
             DirectoryPath = directoryPath;
+            DatabasePath = Path.Combine(directoryPath, "typingtrainer.db");
             ConnectionFactory = connectionFactory;
             ImportRepository = new ContentImportRepository(connectionFactory);
             ImportService = new TextFileImportService(ImportRepository);
             ContentQuery = new ContentQueryService(connectionFactory, new BuiltInParagraphProvider());
             SettingsRepository = new AppSettingsRepository(connectionFactory);
+            BackupService = new LocalDataBackupService(new FixedDatabasePath(DatabasePath));
         }
 
         public string DirectoryPath { get; }
+
+        public string DatabasePath { get; }
 
         public SqliteConnectionFactory ConnectionFactory { get; }
 
@@ -456,6 +567,8 @@ public sealed class ContentServicesTests
         public ContentQueryService ContentQuery { get; }
 
         public AppSettingsRepository SettingsRepository { get; }
+
+        public LocalDataBackupService BackupService { get; }
 
         public static async Task<ContentTestDatabase> CreateInitializedAsync()
         {

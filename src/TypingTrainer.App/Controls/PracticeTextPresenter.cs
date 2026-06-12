@@ -22,6 +22,24 @@ public sealed class PracticeTextPresenter : UserControl
         typeof(PracticeTextPresenter),
         new PropertyMetadata(1.0, OnDisplayScaleChanged));
 
+    public static readonly DependencyProperty FontFamilyNameProperty = DependencyProperty.Register(
+        nameof(FontFamilyName),
+        typeof(string),
+        typeof(PracticeTextPresenter),
+        new PropertyMetadata("Cascadia Mono", OnDisplayScaleChanged));
+
+    public static readonly DependencyProperty TextContrastProperty = DependencyProperty.Register(
+        nameof(TextContrast),
+        typeof(string),
+        typeof(PracticeTextPresenter),
+        new PropertyMetadata("Normal", OnStateChanged));
+
+    public static readonly DependencyProperty CursorStyleProperty = DependencyProperty.Register(
+        nameof(CursorStyle),
+        typeof(string),
+        typeof(PracticeTextPresenter),
+        new PropertyMetadata("Underline", OnStateChanged));
+
     private static readonly SolidColorBrush CorrectBrush = new(Color.FromArgb(255, 32, 145, 108));
     private static readonly SolidColorBrush IncorrectBrush = new(Color.FromArgb(255, 196, 43, 55));
     private static readonly SolidColorBrush CurrentBrush = new(Color.FromArgb(255, 0, 95, 184));
@@ -51,6 +69,24 @@ public sealed class PracticeTextPresenter : UserControl
     {
         get => (double)GetValue(DisplayScaleProperty);
         set => SetValue(DisplayScaleProperty, value);
+    }
+
+    public string FontFamilyName
+    {
+        get => (string)GetValue(FontFamilyNameProperty);
+        set => SetValue(FontFamilyNameProperty, value);
+    }
+
+    public string TextContrast
+    {
+        get => (string)GetValue(TextContrastProperty);
+        set => SetValue(TextContrastProperty, value);
+    }
+
+    public string CursorStyle
+    {
+        get => (string)GetValue(CursorStyleProperty);
+        set => SetValue(CursorStyleProperty, value);
     }
 
     public double GetEstimatedCursorOffsetY()
@@ -108,6 +144,7 @@ public sealed class PracticeTextPresenter : UserControl
     private void ApplyDisplayScale()
     {
         var scale = Math.Clamp(DisplayScale, 0.5, 1.3);
+        _textBlock.FontFamily = new FontFamily(string.IsNullOrWhiteSpace(FontFamilyName) ? "Cascadia Mono, Consolas" : $"{FontFamilyName}, Consolas");
         _textBlock.FontSize = 34 * scale;
         _textBlock.LineHeight = 48 * scale;
     }
@@ -164,6 +201,17 @@ public sealed class PracticeTextPresenter : UserControl
 
     private void AddCurrentRun(char expectedChar)
     {
+        if (string.Equals(CursorStyle, "Bold", StringComparison.OrdinalIgnoreCase))
+        {
+            _textBlock.Inlines.Add(new Run
+            {
+                Text = expectedChar.ToString(),
+                Foreground = CurrentBrush,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold
+            });
+            return;
+        }
+
         var underline = new Underline
         {
             Foreground = CurrentBrush
@@ -178,14 +226,16 @@ public sealed class PracticeTextPresenter : UserControl
         return character.ActualChar ?? character.ExpectedChar;
     }
 
-    private static Brush GetBrush(CharacterState state)
+    private Brush GetBrush(CharacterState state)
     {
         return state switch
         {
             CharacterState.Correct => CorrectBrush,
             CharacterState.Incorrect => IncorrectBrush,
             CharacterState.Current => CurrentBrush,
-            _ => PendingBrush
+            _ => string.Equals(TextContrast, "High", StringComparison.OrdinalIgnoreCase)
+                ? new SolidColorBrush(Color.FromArgb(255, 128, 132, 136))
+                : PendingBrush
         };
     }
 }

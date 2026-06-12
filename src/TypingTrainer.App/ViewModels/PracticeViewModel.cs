@@ -38,6 +38,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private string _typingFeedback = string.Empty;
     private SessionSummary? _lastSummary;
     private SessionReview? _lastReview;
+    private IReadOnlyList<TypingInputEvent> _lastCompletedEvents = Array.Empty<TypingInputEvent>();
     private AppSettings _settings = AppSettings.Defaults;
 
     public PracticeViewModel(
@@ -153,6 +154,29 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public string CharactersText => $"{Math.Min(CurrentState.CursorIndex, CurrentState.TargetText.Length)} / {CurrentState.TargetText.Length}";
 
+    public string PaceGuidanceText
+    {
+        get
+        {
+            var target = _settings.GoalTargetNetWpm;
+            var current = CalculateLiveNetWpm(CurrentState);
+            if (CurrentState.TypedCharacterKeypresses == 0)
+            {
+                return $"Target pace: {target:0} net WPM";
+            }
+
+            if (CurrentState.Accuracy < _settings.GoalTargetAccuracyPercent / 100.0)
+            {
+                return "Accuracy first: slow down until errors settle.";
+            }
+
+            var gap = target - current;
+            return gap <= 0
+                ? $"On pace: {current:0.0} net WPM vs {target:0}"
+                : $"Behind pace by {gap:0.0} WPM";
+        }
+    }
+
     public bool IsComplete => CurrentState.IsComplete;
 
     public bool IsGeneratingLesson
@@ -262,6 +286,19 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public double VisualKeyboardScale => _settings.VisualKeyboardScalePercent / 100.0;
 
+    public string PracticeFontFamily => _settings.PracticeFontFamily;
+
+    public string PracticeTextContrast => _settings.PracticeTextContrast;
+
+    public string PracticeCursorStyle => _settings.PracticeCursorStyle;
+
+    public double PracticeLineWidthMax => _settings.PracticeLineWidth switch
+    {
+        "Narrow" => 760,
+        "Wide" => 1320,
+        _ => 1040
+    };
+
     public Visibility VisualKeyboardVisibility => ShowVisualKeyboard
         ? Visibility.Visible
         : Visibility.Collapsed;
@@ -350,8 +387,9 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             var targetCharacters = PracticeLessonSizeTargets.GetTargetCharacters(
                 PracticeLessonSize.Small,
                 _settings.LessonLengthCharacters);
-            var lesson = await _lessonService.GenerateReviewLessonAsync(
+            var lesson = await _lessonService.GenerateMistakeReplayLessonAsync(
                 _lastReview,
+                _lastCompletedEvents,
                 targetCharacters,
                 cancellationToken);
             SelectedLessonMode = LessonMode.Review;
@@ -378,6 +416,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _lastEscapeTimestampTicks = null;
         _lastSummary = null;
         _lastReview = null;
+        _lastCompletedEvents = Array.Empty<TypingInputEvent>();
         CompletionStatus = string.Empty;
         PauseStatus = string.Empty;
         TypingFeedback = string.Empty;
@@ -488,6 +527,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             {
                 CurrentState = completedSession.GetSnapshot(timestampTicks);
                 _lastSummary = summary;
+                _lastCompletedEvents = events;
                 _lastReview = _reviewGenerator.Generate(summary, events);
                 OnCompletionChanged();
                 OnReviewChanged();
@@ -524,6 +564,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ProgressText));
         OnPropertyChanged(nameof(ProgressPercent));
         OnPropertyChanged(nameof(CharactersText));
+        OnPropertyChanged(nameof(PaceGuidanceText));
         OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(IsInputEnabled));
         OnPropertyChanged(nameof(CompletionStatus));
@@ -577,6 +618,10 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ShowFingerLabels));
         OnPropertyChanged(nameof(PracticeTextScale));
         OnPropertyChanged(nameof(VisualKeyboardScale));
+        OnPropertyChanged(nameof(PracticeFontFamily));
+        OnPropertyChanged(nameof(PracticeTextContrast));
+        OnPropertyChanged(nameof(PracticeCursorStyle));
+        OnPropertyChanged(nameof(PracticeLineWidthMax));
         OnPropertyChanged(nameof(VisualKeyboardVisibility));
         OnKeyboardHighlightChanged();
     }
@@ -684,6 +729,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _completionQueued = false;
         _lastSummary = null;
         _lastReview = null;
+        _lastCompletedEvents = Array.Empty<TypingInputEvent>();
         _lastEscapeTimestampTicks = null;
         IsPaused = false;
         _isStopped = true;

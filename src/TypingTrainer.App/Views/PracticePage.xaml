@@ -245,8 +245,15 @@
                             Tapped="InputSurface_Tapped">
                             <controls:PracticeTextPresenter
                                 x:Name="PracticeTextPresenter"
+                                FontFamilyName="{Binding PracticeFontFamily}"
+                                TextContrast="{Binding PracticeTextContrast}"
+                                CursorStyle="{Binding PracticeCursorStyle}"
                                 State="{Binding CurrentState}" />
                         </ScrollViewer>
+                        <TextBlock
+                            Text="{Binding PaceGuidanceText}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            FontWeight="SemiBold" />
                         <TextBlock
                             Text="{Binding TypingFeedback}"
                             Visibility="{Binding TypingFeedbackVisibility}"

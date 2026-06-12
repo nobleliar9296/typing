@@ -262,6 +262,69 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
+                <Grid ColumnSpacing="16" RowSpacing="16" Visibility="{Binding GoalPanelVisibility}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.2*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Daily Coach" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding DailyPlan.Summary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ListView ItemsSource="{Binding DailyPlanRows}" SelectionMode="None" MaxHeight="220">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="10" Padding="0,7">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="34" />
+                                                <ColumnDefinition Width="120" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="70" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Order}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Description}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="3" Text="{Binding Mode}" />
+                                            <TextBlock Grid.Column="4" Text="{Binding Minutes}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <Button Content="Start Daily Plan" HorizontalAlignment="Left" Click="StartDailyPlanButton_Click" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Achievements" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="Computed locally from saved practice history." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <ListView ItemsSource="{Binding AchievementRows}" SelectionMode="None" MaxHeight="220">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="10" Padding="0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="80" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Description}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding Status}" HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
                 <StackPanel Spacing="24" Visibility="{Binding DashboardContentVisibility}">
                     <Grid ColumnSpacing="12" RowSpacing="12">
                         <Grid.RowDefinitions>
@@ -490,6 +553,50 @@
                         </StackPanel>
                     </Grid>
 
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Keyboard Heatmap" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="Keys ranked by local weakness score from accuracy and latency." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <controls:KeyboardHeatmapControl Rows="{Binding HeatmapRows}" />
+                        <ListView ItemsSource="{Binding HeatmapRows}" SelectionMode="None" MaxHeight="260">
+                            <ListView.Header>
+                                <Grid ColumnSpacing="10" Padding="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Key" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="1" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="2" Text="Median ms" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="3" Text="Samples" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="4" Text="Weakness" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                            </ListView.Header>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="10" Padding="0,7">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="90" />
+                                            <ColumnDefinition Width="90" />
+                                            <ColumnDefinition Width="100" />
+                                            <ColumnDefinition Width="90" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Key}" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Accuracy}" />
+                                        <TextBlock Grid.Column="2" Text="{Binding MedianLatencyMs}" />
+                                        <TextBlock Grid.Column="3" Text="{Binding Samples}" />
+                                        <ProgressBar Grid.Column="4" Maximum="100" Value="{Binding WeaknessPercent}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+
                     <Grid ColumnSpacing="24">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -579,7 +686,7 @@
 
                     <StackPanel Spacing="10">
                         <TextBlock Text="Recent Sessions" FontSize="20" FontWeight="SemiBold" />
-                        <ListView ItemsSource="{Binding RecentSessionRows}" SelectionMode="None">
+                        <ListView ItemsSource="{Binding RecentSessionRows}" SelectionMode="None" IsItemClickEnabled="True" ItemClick="RecentSessionsListView_ItemClick">
                             <ListView.Header>
                                 <Grid ColumnSpacing="12" Padding="0,0,0,6">
                                     <Grid.ColumnDefinitions>

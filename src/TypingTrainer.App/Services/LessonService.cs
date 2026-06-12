@@ -1,7 +1,9 @@
 using TypingTrainer.Core.Keyboard;
+using TypingTrainer.Core.Coaching;
 using TypingTrainer.Core.Lessons;
 using TypingTrainer.Core.Review;
 using TypingTrainer.Core.Skill;
+using TypingTrainer.Core.Typing;
 using TypingTrainer.Data.Content;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Data.Repositories;
@@ -143,6 +145,27 @@ public sealed class LessonService : ILessonService
                 SkillProfileDefaults.Empty(),
                 CreateOptions(LessonMode.Fixed, AppSettings.Defaults, FixedLessonGenerator.FixedLessonText.Length));
         }
+    }
+
+    public Task<LessonGenerationResult> GenerateMistakeReplayLessonAsync(
+        SessionReview review,
+        IReadOnlyList<TypingInputEvent> events,
+        int targetCharacters,
+        CancellationToken cancellationToken = default)
+    {
+        var seed = CreateStableSeed(
+            review.CorrectedErrors,
+            review.UncorrectedErrors,
+            string.Join(string.Empty, review.FocusCharacters),
+            string.Join('|', review.FocusBigrams),
+            events.Count);
+        var lesson = new MistakeReplayGenerator().Generate(
+            review,
+            events,
+            targetCharacters,
+            seed);
+
+        return Task.FromResult(lesson);
     }
 
     private static LessonGenerationOptions CreateOptions(LessonMode mode, AppSettings settings, int targetCharacters)

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.UI.Xaml;
+using TypingTrainer.Core.Coaching;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Data.Repositories;
 using TypingTrainer.Data.Services;
@@ -11,10 +12,14 @@ namespace TypingTrainer.App.ViewModels;
 public sealed class DashboardViewModel : INotifyPropertyChanged
 {
     private readonly IAnalyticsQueryService _analyticsQueryService;
+    private readonly IKeyboardHeatmapQueryService _keyboardHeatmapQueryService;
     private readonly IAppSettingsRepository _settingsRepository;
+    private readonly TypingCoach _typingCoach = new();
+    private readonly AchievementEvaluator _achievementEvaluator = new();
     private AnalyticsRange _selectedRange = AnalyticsRange.Last7Days;
     private DashboardSnapshot? _snapshot;
     private DashboardSnapshot? _weeklySnapshot;
+    private IReadOnlyList<KeyboardHeatmapKeyRow> _heatmapRows = Array.Empty<KeyboardHeatmapKeyRow>();
     private AppSettings _settings = AppSettings.Defaults;
     private bool _isLoading;
     private string? _errorMessage;
@@ -25,9 +30,11 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
 
     public DashboardViewModel(
         IAnalyticsQueryService analyticsQueryService,
+        IKeyboardHeatmapQueryService keyboardHeatmapQueryService,
         IAppSettingsRepository settingsRepository)
     {
         _analyticsQueryService = analyticsQueryService;
+        _keyboardHeatmapQueryService = keyboardHeatmapQueryService;
         _settingsRepository = settingsRepository;
     }
 
@@ -190,6 +197,41 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<DashboardInsightRow> InsightRows => BuildInsightRows();
 
+    public DailyPracticePlan DailyPlan => _typingCoach.BuildDailyPlan(
+        BuildCoachingStats(),
+        ParseTrainingFocus(_settings.GoalTrainingFocus),
+        _settings.GoalTargetSessionMinutes,
+        _settings.GoalTargetEssayWords);
+
+    public IReadOnlyList<PracticePlanStepDisplayRow> DailyPlanRows => DailyPlan.Steps
+        .Select(step => new PracticePlanStepDisplayRow(
+            step.Order.ToString(CultureInfo.InvariantCulture),
+            step.Title,
+            step.Description,
+            step.RecommendedMode.ToString(),
+            $"{step.Minutes} min"))
+        .ToArray();
+
+    public IReadOnlyList<AchievementDisplayRow> AchievementRows => _achievementEvaluator
+        .Evaluate(BuildCoachingStats())
+        .Select(item => new AchievementDisplayRow(
+            item.Title,
+            item.Description,
+            item.IsUnlocked ? "Unlocked" : "Locked",
+            item.IsUnlocked ? 100 : 0))
+        .ToArray();
+
+    public IReadOnlyList<KeyboardHeatmapDisplayRow> HeatmapRows => _heatmapRows
+        .OrderByDescending(row => row.WeaknessScore)
+        .ThenByDescending(row => row.ExposureCount)
+        .Select(row => new KeyboardHeatmapDisplayRow(
+            row.KeyLabel,
+            FormatPercent(row.Accuracy),
+            FormatLatency(row.MedianLatencyMs),
+            row.ExposureCount.ToString(CultureInfo.InvariantCulture),
+            row.WeaknessScore * 100))
+        .ToArray();
+
     public IReadOnlyList<DailyMetricDisplayRow> DailyMetricRows => Snapshot?.DailyMetrics
         .Select(point => new DailyMetricDisplayRow(
             point.Date.ToString("MMM d", CultureInfo.InvariantCulture),
@@ -219,6 +261,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<RecentSessionDisplayRow> RecentSessionRows => Snapshot?.RecentSessions
         .Select(session => new RecentSessionDisplayRow(
+            session.SessionId,
             session.StartedAtUtc.ToLocalTime().ToString("MMM d, h:mm tt", CultureInfo.InvariantCulture),
             FormatWpm(session.NetWpm),
             FormatPercent(session.Accuracy),
@@ -257,6 +300,9 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
                 : await _analyticsQueryService
                     .GetDashboardSnapshotAsync(AnalyticsRange.Last7Days, cancellationToken)
                     .ConfigureAwait(true);
+            _heatmapRows = await _keyboardHeatmapQueryService
+                .GetHeatmapAsync(SelectedRange, GetModeFilterValue(), cancellationToken)
+                .ConfigureAwait(true);
             GoalStatus = string.Empty;
         }
         catch
@@ -378,6 +424,54 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         return steps.Take(3).ToArray();
     }
 
+    private CoachingStats BuildCoachingStats()
+    {
+        var snapshot = Snapshot;
+        var weeklyPracticeMinutes = WeeklyPracticeTime.TotalMinutes;
+        var dailyMetrics = snapshot?.DailyMetrics ?? Array.Empty<DailyMetricPoint>();
+
+        return new CoachingStats(
+            snapshot?.Summary.SessionCount ?? 0,
+            snapshot?.Summary.AverageNetWpm ?? 0,
+            snapshot?.Summary.BestNetWpm ?? 0,
+            snapshot?.Summary.Accuracy ?? 0,
+            snapshot?.RecentSessions.Select(session => session.Accuracy).DefaultIfEmpty(0).Max() ?? 0,
+            weeklyPracticeMinutes,
+            _settings.GoalTargetNetWpm,
+            _settings.GoalTargetAccuracyPercent,
+            _settings.GoalWeeklyPracticeMinutes,
+            CalculateCurrentStreak(dailyMetrics),
+            snapshot?.WeakestCharacters.FirstOrDefault()?.DisplayCharacter,
+            snapshot?.SlowestBigrams.FirstOrDefault()?.DisplayBigram);
+    }
+
+    private static int CalculateCurrentStreak(IReadOnlyList<DailyMetricPoint> dailyMetrics)
+    {
+        if (dailyMetrics.Count == 0)
+        {
+            return 0;
+        }
+
+        var dates = dailyMetrics.Select(point => point.Date).ToHashSet();
+        var current = dailyMetrics.Max(point => point.Date);
+        var streak = 0;
+
+        while (dates.Contains(current))
+        {
+            streak++;
+            current = current.AddDays(-1);
+        }
+
+        return streak;
+    }
+
+    private static TrainingFocus ParseTrainingFocus(string value)
+    {
+        return Enum.TryParse<TrainingFocus>(value, ignoreCase: true, out var focus)
+            ? focus
+            : TrainingFocus.Balanced;
+    }
+
     private IReadOnlyList<DashboardInsightRow> BuildInsightRows()
     {
         var snapshot = Snapshot;
@@ -486,6 +580,9 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(TodayRecommendationText));
         OnPropertyChanged(nameof(GoalActionSteps));
         OnPropertyChanged(nameof(InsightRows));
+        OnPropertyChanged(nameof(DailyPlan));
+        OnPropertyChanged(nameof(DailyPlanRows));
+        OnPropertyChanged(nameof(AchievementRows));
     }
 
     private static int ClampToInt(double value, int minimum, int maximum)
@@ -520,6 +617,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(SlowestCharacterRows));
         OnPropertyChanged(nameof(WeakestBigramRows));
         OnPropertyChanged(nameof(SlowestBigramRows));
+        OnPropertyChanged(nameof(HeatmapRows));
         OnGoalSettingsChanged();
     }
 
@@ -537,6 +635,7 @@ public sealed record DailyMetricDisplayRow(
     string SessionCount);
 
 public sealed record RecentSessionDisplayRow(
+    Guid SessionId,
     string StartedAt,
     string NetWpm,
     string Accuracy,
@@ -551,6 +650,26 @@ public sealed record DashboardInsightRow(
     string Title,
     string Value,
     string Detail);
+
+public sealed record PracticePlanStepDisplayRow(
+    string Order,
+    string Title,
+    string Description,
+    string Mode,
+    string Minutes);
+
+public sealed record AchievementDisplayRow(
+    string Title,
+    string Description,
+    string Status,
+    double Progress);
+
+public sealed record KeyboardHeatmapDisplayRow(
+    string Key,
+    string Accuracy,
+    string MedianLatencyMs,
+    string Samples,
+    double WeaknessPercent);
 
 public sealed record AnalyticsDisplayRow(
     string Label,
