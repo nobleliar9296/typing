@@ -6,7 +6,11 @@
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
     Loaded="PracticePage_Loaded">
 
-    <Grid Padding="32" RowSpacing="24">
+    <Grid
+        x:Name="PracticeRoot"
+        Padding="32"
+        RowSpacing="24"
+        PointerPressed="PracticeRoot_PointerPressed">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -31,20 +35,34 @@
                     <Button Content="Dashboard" Click="DashboardButton_Click" />
                     <Button Content="Settings" Click="SettingsButton_Click" />
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-                    <TextBlock Text="Lesson mode:" VerticalAlignment="Center" />
-                    <ComboBox
-                        x:Name="LessonModeComboBox"
-                        Width="160"
-                        SelectedIndex="0"
-                        SelectionChanged="LessonModeComboBox_SelectionChanged">
-                        <ComboBoxItem Content="Adaptive" />
-                        <ComboBoxItem Content="Paragraph" />
-                        <ComboBoxItem Content="Weak Keys" />
-                        <ComboBoxItem Content="Weak Bigrams" />
-                        <ComboBoxItem Content="Review" />
-                        <ComboBoxItem Content="Fixed" />
-                    </ComboBox>
+                <StackPanel Orientation="Horizontal" Spacing="18" Margin="0,8,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Lesson mode:" VerticalAlignment="Center" />
+                        <ComboBox
+                            x:Name="LessonModeComboBox"
+                            Width="160"
+                            SelectedIndex="0"
+                            SelectionChanged="LessonModeComboBox_SelectionChanged">
+                            <ComboBoxItem Content="Adaptive" />
+                            <ComboBoxItem Content="Paragraph" />
+                            <ComboBoxItem Content="Weak Keys" />
+                            <ComboBoxItem Content="Weak Bigrams" />
+                            <ComboBoxItem Content="Review" />
+                            <ComboBoxItem Content="Fixed" />
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Lesson size:" VerticalAlignment="Center" />
+                        <ComboBox
+                            x:Name="LessonSizeComboBox"
+                            Width="132"
+                            SelectedIndex="0"
+                            SelectionChanged="LessonSizeComboBox_SelectionChanged">
+                            <ComboBoxItem Content="Small" />
+                            <ComboBoxItem Content="Medium" />
+                            <ComboBoxItem Content="Long" />
+                        </ComboBox>
+                    </StackPanel>
                 </StackPanel>
                 <TextBlock
                     Text="{Binding LessonReason}"
@@ -89,7 +107,7 @@
             Grid.Row="1"
             Spacing="18"
             HorizontalAlignment="Stretch"
-            VerticalAlignment="Center">
+            VerticalAlignment="Top">
             <controls:TypingInputSurface
                 x:Name="InputSurface"
                 CharacterReceived="InputSurface_CharacterReceived"
@@ -106,12 +124,26 @@
                     PointerPressed="InputSurface_PointerPressed"
                     Tapped="InputSurface_Tapped">
                     <StackPanel Spacing="18">
-                        <controls:PracticeTextPresenter
-                            State="{Binding CurrentState}" />
+                        <ScrollViewer
+                            x:Name="PracticeTextScrollViewer"
+                            MinHeight="190"
+                            MaxHeight="360"
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto"
+                            PointerPressed="InputSurface_PointerPressed"
+                            Tapped="InputSurface_Tapped">
+                            <controls:PracticeTextPresenter
+                                x:Name="PracticeTextPresenter"
+                                State="{Binding CurrentState}" />
+                        </ScrollViewer>
                         <TextBlock
                             Text="{Binding TypingFeedback}"
                             Visibility="{Binding TypingFeedbackVisibility}"
                             Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                        <TextBlock
+                            Text="{Binding PauseStatus}"
+                            Visibility="{Binding PauseOverlayVisibility}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <TextBlock
                             Text="{Binding CompletionStatus}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />

@@ -11,5 +11,6 @@ public interface ILessonService
 
     Task<LessonGenerationResult> GenerateNextLessonAsync(
         LessonMode mode,
+        int? targetCharactersOverride = null,
         CancellationToken cancellationToken = default);
 }

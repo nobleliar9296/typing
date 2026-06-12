@@ -1,6 +1,9 @@
+using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using TypingTrainer.App.ViewModels;
 using TypingTrainer.Core.Lessons;
 using Windows.System;
@@ -49,6 +52,7 @@ public sealed partial class PracticePage : Page
         }
 
         InputSurface.Focus(FocusState.Programmatic);
+        QueueScrollToCursor();
     }
 
     private void InputSurface_Tapped(object sender, TappedRoutedEventArgs e)
@@ -69,15 +73,23 @@ public sealed partial class PracticePage : Page
         if (!char.IsControl(character))
         {
             ViewModel.HandleCharacter(character);
+            QueueScrollToCursor();
             args.Handled = true;
         }
     }
 
     private void InputSurface_KeyDown(object sender, KeyRoutedEventArgs args)
     {
-        if (args.Key == VirtualKey.Back)
+        if (args.Key == VirtualKey.Escape)
+        {
+            ViewModel.HandleEscape(Stopwatch.GetTimestamp());
+            InputSurface.Focus(FocusState.Programmatic);
+            args.Handled = true;
+        }
+        else if (args.Key == VirtualKey.Back)
         {
             ViewModel.HandleBackspace();
+            QueueScrollToCursor();
             args.Handled = true;
         }
     }
@@ -85,6 +97,8 @@ public sealed partial class PracticePage : Page
     private void RestartAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         ViewModel.StartNewLesson();
+        InputSurface.Focus(FocusState.Programmatic);
+        QueueScrollToCursor();
         args.Handled = true;
     }
 
@@ -92,12 +106,14 @@ public sealed partial class PracticePage : Page
     {
         ViewModel.StartNewLesson();
         InputSurface.Focus(FocusState.Programmatic);
+        QueueScrollToCursor();
     }
 
     private async void NextLessonButton_Click(object sender, RoutedEventArgs e)
     {
         await ViewModel.GenerateNextLessonAsync();
         InputSurface.Focus(FocusState.Programmatic);
+        QueueScrollToCursor();
     }
 
     private void DashboardButton_Click(object sender, RoutedEventArgs e)
@@ -143,5 +159,68 @@ public sealed partial class PracticePage : Page
 
         await ViewModel.ChangeLessonModeAsync(mode);
         InputSurface.Focus(FocusState.Programmatic);
+        QueueScrollToCursor();
+    }
+
+    private async void LessonSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded)
+        {
+            return;
+        }
+
+        var size = LessonSizeComboBox.SelectedIndex switch
+        {
+            1 => PracticeLessonSize.Medium,
+            2 => PracticeLessonSize.Long,
+            _ => PracticeLessonSize.Small
+        };
+
+        await ViewModel.ChangeLessonSizeAsync(size);
+        InputSurface.Focus(FocusState.Programmatic);
+        QueueScrollToCursor();
+    }
+
+    private void PracticeRoot_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (!IsInteractiveElement(e.OriginalSource as DependencyObject))
+        {
+            InputSurface.Focus(FocusState.Pointer);
+        }
+    }
+
+    private void QueueScrollToCursor()
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            var textLength = Math.Max(1, ViewModel.CurrentState.TargetText.Length);
+            var ratio = Math.Clamp(ViewModel.CurrentState.CursorIndex / (double)textLength, 0, 1);
+            var offset = PracticeTextScrollViewer.ScrollableHeight * ratio;
+            PracticeTextScrollViewer.ChangeView(null, offset, null, disableAnimation: true);
+        });
+    }
+
+    private static bool IsInteractiveElement(DependencyObject? source)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            if (current is ButtonBase
+                or ComboBox
+                or TextBox
+                or NumberBox
+                or ToggleSwitch
+                or CheckBox
+                or RadioButton
+                or Slider
+                or ScrollBar)
+            {
+                return true;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return false;
     }
 }

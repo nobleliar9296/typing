@@ -22,18 +22,29 @@ public sealed class ContentQueryService : IContentQueryService
         ParagraphPracticeQuery query,
         CancellationToken cancellationToken = default)
     {
+        return (await GetParagraphsAsync(query, cancellationToken).ConfigureAwait(false)).FirstOrDefault();
+    }
+
+    public async Task<IReadOnlyList<PracticeContentItem>> GetParagraphsAsync(
+        ParagraphPracticeQuery query,
+        CancellationToken cancellationToken = default)
+    {
         if (query.UseImportedContent)
         {
-            var imported = await GetImportedParagraphAsync(query, cancellationToken).ConfigureAwait(false);
-            if (imported is not null)
+            var imported = await GetImportedParagraphsAsync(query, cancellationToken).ConfigureAwait(false);
+            if (HasEnoughText(imported, query.TargetCharacters) || !query.UseBuiltInContent)
             {
                 return imported;
             }
+
+            var combined = imported.ToList();
+            combined.AddRange(GetBuiltInParagraphs(query, query.TargetCharacters - CountJoinedCharacters(combined)));
+            return combined;
         }
 
         return query.UseBuiltInContent
-            ? GetBuiltInParagraph(query)
-            : null;
+            ? GetBuiltInParagraphs(query, query.TargetCharacters)
+            : Array.Empty<PracticeContentItem>();
     }
 
     public async Task<IReadOnlyList<ContentPackRow>> GetContentPacksAsync(
@@ -94,7 +105,7 @@ public sealed class ContentQueryService : IContentQueryService
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<PracticeContentItem?> GetImportedParagraphAsync(
+    private async Task<IReadOnlyList<PracticeContentItem>> GetImportedParagraphsAsync(
         ParagraphPracticeQuery query,
         CancellationToken cancellationToken)
     {
@@ -121,23 +132,24 @@ public sealed class ContentQueryService : IContentQueryService
               ABS(item.character_count - $targetCharacters) ASC,
               item.difficulty_score ASC,
               item.created_at_utc ASC
-            LIMIT 1;
+            LIMIT 80;
             """;
         command.Parameters.AddWithValue("$allowCapitalLetters", query.AllowCapitalLetters ? 1 : 0);
         command.Parameters.AddWithValue("$allowNumbers", query.AllowNumbers ? 1 : 0);
         command.Parameters.AddWithValue("$allowPunctuation", query.AllowPunctuation ? 1 : 0);
         command.Parameters.AddWithValue("$targetCharacters", query.TargetCharacters);
 
-        PracticeContentItem? item = null;
+        var candidates = new List<PracticeContentItem>();
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                item = ReadContentItem(reader);
+                candidates.Add(ReadContentItem(reader));
             }
         }
 
-        if (item is not null)
+        var selected = SelectUntilTarget(candidates, query.TargetCharacters);
+        foreach (var item in selected)
         {
             await using var updateCommand = connection.CreateCommand();
             updateCommand.Transaction = (SqliteTransaction)transaction;
@@ -153,18 +165,43 @@ public sealed class ContentQueryService : IContentQueryService
         }
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-        return item;
+        return selected;
     }
 
-    private PracticeContentItem? GetBuiltInParagraph(ParagraphPracticeQuery query)
+    private IReadOnlyList<PracticeContentItem> GetBuiltInParagraphs(ParagraphPracticeQuery query, int targetCharacters)
     {
-        return _builtInContentProvider
+        var candidates = _builtInContentProvider
             .GetContentItems()
             .Where(item => item.Kind == PracticeContentKind.Paragraph)
             .Where(item => IsAllowed(item, query))
             .OrderBy(item => Math.Abs(item.CharacterCount - query.TargetCharacters))
             .ThenBy(item => item.DifficultyScore)
-            .FirstOrDefault();
+            .ToArray();
+
+        if (candidates.Length == 0)
+        {
+            return Array.Empty<PracticeContentItem>();
+        }
+
+        var selected = new List<PracticeContentItem>();
+        var totalCharacters = 0;
+        var index = 0;
+        var safeTarget = Math.Max(20, targetCharacters);
+
+        while (totalCharacters < safeTarget && selected.Count < 100)
+        {
+            var item = candidates[index % candidates.Length];
+            selected.Add(item);
+            totalCharacters += item.CharacterCount + 2;
+            index++;
+
+            if (safeTarget <= candidates[0].CharacterCount)
+            {
+                break;
+            }
+        }
+
+        return selected;
     }
 
     private static bool IsAllowed(PracticeContentItem item, ParagraphPracticeQuery query)
@@ -172,6 +209,48 @@ public sealed class ContentQueryService : IContentQueryService
         return (query.AllowCapitalLetters || !item.ContainsCapitalLetters)
             && (query.AllowNumbers || !item.ContainsNumbers)
             && (query.AllowPunctuation || !item.ContainsPunctuation);
+    }
+
+    private static IReadOnlyList<PracticeContentItem> SelectUntilTarget(
+        IReadOnlyList<PracticeContentItem> candidates,
+        int targetCharacters)
+    {
+        if (candidates.Count == 0)
+        {
+            return Array.Empty<PracticeContentItem>();
+        }
+
+        var selected = new List<PracticeContentItem>();
+        var totalCharacters = 0;
+        var safeTarget = Math.Max(20, targetCharacters);
+
+        foreach (var candidate in candidates)
+        {
+            selected.Add(candidate);
+            totalCharacters += candidate.CharacterCount + 2;
+
+            if (totalCharacters >= safeTarget)
+            {
+                break;
+            }
+        }
+
+        return selected;
+    }
+
+    private static bool HasEnoughText(IReadOnlyList<PracticeContentItem> items, int targetCharacters)
+    {
+        return CountJoinedCharacters(items) >= Math.Max(20, targetCharacters);
+    }
+
+    private static int CountJoinedCharacters(IReadOnlyList<PracticeContentItem> items)
+    {
+        if (items.Count == 0)
+        {
+            return 0;
+        }
+
+        return items.Sum(item => item.CharacterCount) + ((items.Count - 1) * 2);
     }
 
     private static PracticeContentItem ReadContentItem(SqliteDataReader reader)

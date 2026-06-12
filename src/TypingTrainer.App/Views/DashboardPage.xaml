@@ -68,6 +68,124 @@
                     TextWrapping="Wrap"
                     Visibility="{Binding EmptyStateVisibility}" />
 
+                <Border
+                    Padding="16"
+                    BorderThickness="1"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    CornerRadius="8"
+                    Visibility="{Binding GoalPanelVisibility}">
+                    <StackPanel Spacing="14">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Typing Goal" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock
+                                    Text="Set a local target and use the plan below to decide what to practice next."
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock
+                                Grid.Column="1"
+                                Text="{Binding GoalStatus}"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="12" RowSpacing="12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <TextBlock Text="{Binding GoalCurrentNetWpmText}" FontSize="24" FontWeight="SemiBold" />
+                                <TextBlock Text="Current avg net WPM" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="{Binding GoalTargetNetWpmText}" FontSize="24" FontWeight="SemiBold" />
+                                <TextBlock Text="Target net WPM" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="{Binding GoalWpmGapText}" FontSize="24" FontWeight="SemiBold" />
+                                <TextBlock Text="Speed gap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1">
+                                <TextBlock Text="{Binding GoalTargetAccuracyText}" FontSize="24" FontWeight="SemiBold" />
+                                <TextBlock Text="Target accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="1">
+                                <TextBlock Text="{Binding GoalWeeklyPracticeText}" FontSize="24" FontWeight="SemiBold" />
+                                <TextBlock Text="Practice target" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="2">
+                                <TextBlock Text="{Binding GoalWeeklyProgressText}" FontSize="18" FontWeight="SemiBold" />
+                                <TextBlock Text="Weekly progress" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <NumberBox
+                                Header="Target net WPM"
+                                Minimum="10"
+                                Maximum="250"
+                                SmallChange="1"
+                                LargeChange="5"
+                                Value="{Binding GoalTargetNetWpm, Mode=TwoWay}" />
+                            <NumberBox
+                                Grid.Column="1"
+                                Header="Target accuracy %"
+                                Minimum="50"
+                                Maximum="100"
+                                SmallChange="1"
+                                LargeChange="5"
+                                Value="{Binding GoalTargetAccuracyPercent, Mode=TwoWay}" />
+                            <NumberBox
+                                Grid.Column="2"
+                                Header="Weekly minutes"
+                                Minimum="0"
+                                Maximum="10080"
+                                SmallChange="5"
+                                LargeChange="30"
+                                Value="{Binding GoalWeeklyPracticeMinutes, Mode=TwoWay}" />
+                            <Button
+                                Grid.Column="3"
+                                Content="Save Goals"
+                                VerticalAlignment="Bottom"
+                                Click="SaveGoalsButton_Click" />
+                        </Grid>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Path to your goal" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding GoalActionSteps}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Text="{Binding}"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            TextWrapping="Wrap"
+                                            Margin="0,2,0,0" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <StackPanel Spacing="24" Visibility="{Binding DashboardContentVisibility}">
                     <Grid ColumnSpacing="12" RowSpacing="12">
                         <Grid.RowDefinitions>
@@ -134,30 +252,60 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Spacing="8">
-                            <TextBlock Text="Net WPM" FontSize="20" FontWeight="SemiBold" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Net WPM" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="Daily average net words per minute" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
                             <Border Padding="12" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
-                                <controls:TrendLineChart Points="{Binding NetWpmPoints}" />
+                                <controls:TrendLineChart Points="{Binding NetWpmPoints}" ValueSuffix=" WPM" />
                             </Border>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Spacing="8">
-                            <TextBlock Text="Accuracy" FontSize="20" FontWeight="SemiBold" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Accuracy" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="Daily keypress accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
                             <Border Padding="12" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
-                                <controls:TrendLineChart Points="{Binding AccuracyPoints}" />
+                                <controls:TrendLineChart Points="{Binding AccuracyPoints}" ValueSuffix="%" MaximumValue="100" />
                             </Border>
                         </StackPanel>
 
                         <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="8">
-                            <TextBlock Text="Practice Time" FontSize="20" FontWeight="SemiBold" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Practice Time" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="Daily minutes practiced" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
                             <Border Padding="12" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
-                                <controls:BarChart Points="{Binding PracticeTimePoints}" />
+                                <controls:BarChart Points="{Binding PracticeTimePoints}" ValueSuffix=" min" />
                             </Border>
                         </StackPanel>
                     </Grid>
 
                     <StackPanel Spacing="10">
-                        <TextBlock Text="Daily Trend" FontSize="20" FontWeight="SemiBold" />
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Daily Trend" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock
+                                Text="Grouped by your local calendar date."
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
                         <ListView ItemsSource="{Binding DailyMetricRows}" SelectionMode="None">
+                            <ListView.Header>
+                                <Grid ColumnSpacing="12" Padding="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="80" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Date" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="1" Text="Net WPM" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="2" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="3" Text="Practice" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="4" Text="Sessions" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                            </ListView.Header>
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Grid ColumnSpacing="12" Padding="0,8">
@@ -188,6 +336,22 @@
                         <StackPanel Spacing="10">
                             <TextBlock Text="Weakest Keys" FontSize="20" FontWeight="SemiBold" />
                             <ListView ItemsSource="{Binding WeakestCharacterRows}" SelectionMode="None">
+                                <ListView.Header>
+                                    <Grid ColumnSpacing="10" Padding="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="70" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Key" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="2" Text="Median ms" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="3" Text="Samples" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="4" Text="Weakness" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Grid>
+                                </ListView.Header>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="10" Padding="0,8">
@@ -212,6 +376,22 @@
                         <StackPanel Grid.Column="1" Spacing="10">
                             <TextBlock Text="Slowest Keys" FontSize="20" FontWeight="SemiBold" />
                             <ListView ItemsSource="{Binding SlowestCharacterRows}" SelectionMode="None">
+                                <ListView.Header>
+                                    <Grid ColumnSpacing="10" Padding="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="70" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Key" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="2" Text="Median ms" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="3" Text="Samples" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="4" Text="Weakness" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Grid>
+                                </ListView.Header>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="10" Padding="0,8">
@@ -243,6 +423,22 @@
                         <StackPanel Spacing="10">
                             <TextBlock Text="Weakest Bigrams" FontSize="20" FontWeight="SemiBold" />
                             <ListView ItemsSource="{Binding WeakestBigramRows}" SelectionMode="None">
+                                <ListView.Header>
+                                    <Grid ColumnSpacing="10" Padding="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Bigram" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="2" Text="Median ms" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="3" Text="Samples" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="4" Text="Weakness" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Grid>
+                                </ListView.Header>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="10" Padding="0,8">
@@ -267,6 +463,22 @@
                         <StackPanel Grid.Column="1" Spacing="10">
                             <TextBlock Text="Slowest Bigrams" FontSize="20" FontWeight="SemiBold" />
                             <ListView ItemsSource="{Binding SlowestBigramRows}" SelectionMode="None">
+                                <ListView.Header>
+                                    <Grid ColumnSpacing="10" Padding="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Bigram" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="2" Text="Median ms" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="3" Text="Samples" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="4" Text="Weakness" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Grid>
+                                </ListView.Header>
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="10" Padding="0,8">
@@ -292,6 +504,22 @@
                     <StackPanel Spacing="10">
                         <TextBlock Text="Recent Sessions" FontSize="20" FontWeight="SemiBold" />
                         <ListView ItemsSource="{Binding RecentSessionRows}" SelectionMode="None">
+                            <ListView.Header>
+                                <Grid ColumnSpacing="12" Padding="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="100" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Started" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="1" Text="Net WPM" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="2" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="3" Text="Duration" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Grid.Column="4" Text="Mode" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                            </ListView.Header>
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Grid ColumnSpacing="12" Padding="0,8">

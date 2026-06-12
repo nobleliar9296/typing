@@ -150,6 +150,35 @@ public sealed class ContentServicesTests
     }
 
     [TestMethod]
+    public async Task ContentQueryService_GetParagraphs_ReturnsMultipleParagraphsForLongTarget()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var filePath = database.CreateTextFile("long.txt", """
+            this first imported paragraph has enough lowercase words for a longer practice lesson
+
+            this second imported paragraph should be joined when the target length needs more text
+
+            this third imported paragraph gives the query service another chunk for essay practice
+            """);
+
+        await database.ImportService.ImportTextFileAsync(
+            filePath,
+            new TextImportOptions("Long", MinParagraphCharacters: 20));
+
+        var paragraphs = await database.ContentQuery.GetParagraphsAsync(
+            new ParagraphPracticeQuery(
+                TargetCharacters: 180,
+                AllowCapitalLetters: false,
+                AllowNumbers: false,
+                AllowPunctuation: false,
+                UseImportedContent: true,
+                UseBuiltInContent: false));
+
+        Assert.IsTrue(paragraphs.Count > 1);
+        Assert.IsTrue(paragraphs.Sum(paragraph => paragraph.CharacterCount) >= 180);
+    }
+
+    [TestMethod]
     public async Task ContentQueryService_DeleteContentPack_RemovesParagraphs()
     {
         await using var database = await ContentTestDatabase.CreateInitializedAsync();
@@ -181,6 +210,9 @@ public sealed class ContentServicesTests
         Assert.IsTrue(settings.ShowFingerColors);
         Assert.IsFalse(settings.ShowFingerLabels);
         Assert.AreEqual(AppSettings.QwertyKeyboardLayout, settings.VisualKeyboardLayout);
+        Assert.AreEqual(60, settings.GoalTargetNetWpm);
+        Assert.AreEqual(95, settings.GoalTargetAccuracyPercent);
+        Assert.AreEqual(75, settings.GoalWeeklyPracticeMinutes);
     }
 
     [TestMethod]
@@ -268,6 +300,36 @@ public sealed class ContentServicesTests
         Assert.IsFalse(settings.ShowFingerColors);
         Assert.IsTrue(settings.ShowFingerLabels);
         Assert.AreEqual(AppSettings.QwertyKeyboardLayout, settings.VisualKeyboardLayout);
+    }
+
+    [TestMethod]
+    public async Task AppSettingsRepository_DefaultGoalSettings_AreReturnedWhenEmpty()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+
+        var settings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual(60, settings.GoalTargetNetWpm);
+        Assert.AreEqual(95, settings.GoalTargetAccuracyPercent);
+        Assert.AreEqual(75, settings.GoalWeeklyPracticeMinutes);
+    }
+
+    [TestMethod]
+    public async Task AppSettingsRepository_SaveGoalSettings_Persists()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+
+        await database.SettingsRepository.SaveSettingsAsync(AppSettings.Defaults with
+        {
+            GoalTargetNetWpm = 72,
+            GoalTargetAccuracyPercent = 97,
+            GoalWeeklyPracticeMinutes = 120
+        });
+        var settings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual(72, settings.GoalTargetNetWpm);
+        Assert.AreEqual(97, settings.GoalTargetAccuracyPercent);
+        Assert.AreEqual(120, settings.GoalWeeklyPracticeMinutes);
     }
 
     [TestMethod]

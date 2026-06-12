@@ -29,7 +29,7 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         var defaults = AppSettings.Defaults;
         return new AppSettings(
             GetString(values, "DefaultLessonMode", defaults.DefaultLessonMode),
-            GetInt(values, "LessonLengthCharacters", defaults.LessonLengthCharacters),
+            GetClampedInt(values, "LessonLengthCharacters", defaults.LessonLengthCharacters, 20, 5000),
             GetBool(values, "AllowCapitalLetters", defaults.AllowCapitalLetters),
             GetBool(values, "AllowNumbers", defaults.AllowNumbers),
             GetBool(values, "AllowPunctuation", defaults.AllowPunctuation),
@@ -41,7 +41,10 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             GetBool(values, "visualKeyboard.showKeyboard", defaults.ShowVisualKeyboard),
             GetBool(values, "visualKeyboard.showFingerColors", defaults.ShowFingerColors),
             GetBool(values, "visualKeyboard.showFingerLabels", defaults.ShowFingerLabels),
-            GetString(values, "visualKeyboard.layout", defaults.VisualKeyboardLayout));
+            GetString(values, "visualKeyboard.layout", defaults.VisualKeyboardLayout),
+            GetClampedInt(values, "goals.targetNetWpm", defaults.GoalTargetNetWpm, 10, 250),
+            GetClampedInt(values, "goals.targetAccuracyPercent", defaults.GoalTargetAccuracyPercent, 50, 100),
+            GetClampedInt(values, "goals.weeklyPracticeMinutes", defaults.GoalWeeklyPracticeMinutes, 0, 10_080));
     }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -63,6 +66,9 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.showFingerColors", Bool(settings.ShowFingerColors), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.showFingerLabels", Bool(settings.ShowFingerLabels), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "visualKeyboard.layout", settings.VisualKeyboardLayout, cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetNetWpm", settings.GoalTargetNetWpm.ToString(), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetAccuracyPercent", settings.GoalTargetAccuracyPercent.ToString(), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.weeklyPracticeMinutes", settings.GoalWeeklyPracticeMinutes.ToString(), cancellationToken).ConfigureAwait(false);
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -93,10 +99,15 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             : fallback;
     }
 
-    private static int GetInt(Dictionary<string, string> values, string key, int fallback)
+    private static int GetClampedInt(
+        Dictionary<string, string> values,
+        string key,
+        int fallback,
+        int minimum,
+        int maximum)
     {
         return values.TryGetValue(key, out var value) && int.TryParse(value, out var parsed)
-            ? Math.Clamp(parsed, 20, 5000)
+            ? Math.Clamp(parsed, minimum, maximum)
             : fallback;
     }
 

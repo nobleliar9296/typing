@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.UI.Xaml;
 using TypingTrainer.Data.Models;
+using TypingTrainer.Data.Repositories;
 using TypingTrainer.Data.Services;
 
 namespace TypingTrainer.App.ViewModels;
@@ -10,14 +11,21 @@ namespace TypingTrainer.App.ViewModels;
 public sealed class DashboardViewModel : INotifyPropertyChanged
 {
     private readonly IAnalyticsQueryService _analyticsQueryService;
+    private readonly IAppSettingsRepository _settingsRepository;
     private AnalyticsRange _selectedRange = AnalyticsRange.Last7Days;
     private DashboardSnapshot? _snapshot;
+    private DashboardSnapshot? _weeklySnapshot;
+    private AppSettings _settings = AppSettings.Defaults;
     private bool _isLoading;
     private string? _errorMessage;
+    private string _goalStatus = string.Empty;
 
-    public DashboardViewModel(IAnalyticsQueryService analyticsQueryService)
+    public DashboardViewModel(
+        IAnalyticsQueryService analyticsQueryService,
+        IAppSettingsRepository settingsRepository)
     {
         _analyticsQueryService = analyticsQueryService;
+        _settingsRepository = settingsRepository;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -92,6 +100,10 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         ? Visibility.Visible
         : Visibility.Collapsed;
 
+    public Visibility GoalPanelVisibility => !IsLoading && ErrorMessage is null
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
     public string SessionCountText => Snapshot?.Summary.SessionCount.ToString(CultureInfo.InvariantCulture) ?? "0";
 
     public string PracticeTimeText => FormatDuration(Snapshot?.Summary.TotalPracticeTime ?? TimeSpan.Zero);
@@ -104,6 +116,59 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
 
     public string ErrorsText => ((Snapshot?.Summary.IncorrectKeypresses ?? 0) + (Snapshot?.Summary.UncorrectedErrors ?? 0))
         .ToString(CultureInfo.InvariantCulture);
+
+    public double GoalTargetNetWpm
+    {
+        get => _settings.GoalTargetNetWpm;
+        set => UpdateGoalSettings(_settings with { GoalTargetNetWpm = ClampToInt(value, 10, 250) });
+    }
+
+    public double GoalTargetAccuracyPercent
+    {
+        get => _settings.GoalTargetAccuracyPercent;
+        set => UpdateGoalSettings(_settings with { GoalTargetAccuracyPercent = ClampToInt(value, 50, 100) });
+    }
+
+    public double GoalWeeklyPracticeMinutes
+    {
+        get => _settings.GoalWeeklyPracticeMinutes;
+        set => UpdateGoalSettings(_settings with { GoalWeeklyPracticeMinutes = ClampToInt(value, 0, 10_080) });
+    }
+
+    public string GoalCurrentNetWpmText => FormatWpm(Snapshot?.Summary.AverageNetWpm ?? 0);
+
+    public string GoalTargetNetWpmText => FormatWpm(_settings.GoalTargetNetWpm);
+
+    public string GoalWpmGapText
+    {
+        get
+        {
+            var gap = Math.Max(0, _settings.GoalTargetNetWpm - (Snapshot?.Summary.AverageNetWpm ?? 0));
+            return gap <= 0 ? "Goal reached" : $"{FormatWpm(gap)} WPM to go";
+        }
+    }
+
+    public string GoalTargetAccuracyText => $"{_settings.GoalTargetAccuracyPercent}%";
+
+    public string GoalWeeklyPracticeText => $"{_settings.GoalWeeklyPracticeMinutes} min/week";
+
+    public string GoalWeeklyProgressText =>
+        $"{FormatDuration(WeeklyPracticeTime)} practiced in the last 7 days";
+
+    public string GoalStatus
+    {
+        get => _goalStatus;
+        private set
+        {
+            if (_goalStatus != value)
+            {
+                _goalStatus = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public IReadOnlyList<string> GoalActionSteps => BuildGoalActionSteps();
 
     public IReadOnlyList<DailyMetricDisplayRow> DailyMetricRows => Snapshot?.DailyMetrics
         .Select(point => new DailyMetricDisplayRow(
@@ -163,9 +228,16 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         {
             IsLoading = true;
             ErrorMessage = null;
+            _settings = await _settingsRepository.GetSettingsAsync(cancellationToken).ConfigureAwait(true);
             Snapshot = await _analyticsQueryService
                 .GetDashboardSnapshotAsync(SelectedRange, cancellationToken)
                 .ConfigureAwait(true);
+            _weeklySnapshot = SelectedRange == AnalyticsRange.Last7Days
+                ? Snapshot
+                : await _analyticsQueryService
+                    .GetDashboardSnapshotAsync(AnalyticsRange.Last7Days, cancellationToken)
+                    .ConfigureAwait(true);
+            GoalStatus = string.Empty;
         }
         catch
         {
@@ -176,6 +248,13 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             IsLoading = false;
             OnSnapshotChanged();
         }
+    }
+
+    public async Task SaveGoalsAsync(CancellationToken cancellationToken = default)
+    {
+        await _settingsRepository.SaveSettingsAsync(_settings, cancellationToken).ConfigureAwait(true);
+        GoalStatus = "Typing goals saved locally.";
+        OnGoalSettingsChanged();
     }
 
     private static AnalyticsDisplayRow ToDisplayRow(string label, CharacterAnalyticsRow row)
@@ -230,12 +309,87 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         return $"{Math.Max(0, value.Seconds)}s";
     }
 
+    private TimeSpan WeeklyPracticeTime => _weeklySnapshot?.Summary.TotalPracticeTime ?? TimeSpan.Zero;
+
+    private IReadOnlyList<string> BuildGoalActionSteps()
+    {
+        var steps = new List<string>();
+        var summary = Snapshot?.Summary;
+        var sessionCount = summary?.SessionCount ?? 0;
+        var accuracyTarget = _settings.GoalTargetAccuracyPercent / 100.0;
+        var averageNetWpm = summary?.AverageNetWpm ?? 0;
+        var accuracy = summary?.Accuracy ?? 0;
+        var weeklyPracticeMinutes = WeeklyPracticeTime.TotalMinutes;
+        var remainingPracticeMinutes = Math.Max(0, _settings.GoalWeeklyPracticeMinutes - weeklyPracticeMinutes);
+
+        if (sessionCount < 5)
+        {
+            steps.Add($"Complete {5 - sessionCount} more saved sessions so the plan has a steadier baseline.");
+        }
+
+        if (accuracy < accuracyTarget)
+        {
+            steps.Add("Use Strict Accuracy Mode and Weak Keys until accuracy is consistently on target.");
+        }
+        else if (averageNetWpm < _settings.GoalTargetNetWpm)
+        {
+            steps.Add("Use Paragraph mode for flow, then Weak Bigrams to smooth slow transitions.");
+        }
+
+        if (remainingPracticeMinutes > 0)
+        {
+            steps.Add($"Practice {FormatDuration(TimeSpan.FromMinutes(remainingPracticeMinutes))} more this week.");
+        }
+
+        if (steps.Count == 0)
+        {
+            steps.Add("You are on pace. Raise the WPM target when this feels comfortable.");
+        }
+
+        steps.Add("Keep sessions short: 10-15 focused minutes beats one long grind.");
+        steps.Add("After each paragraph block, review the weak keys list and run one targeted lesson.");
+
+        return steps.Take(3).ToArray();
+    }
+
+    private void UpdateGoalSettings(AppSettings settings)
+    {
+        _settings = settings;
+        GoalStatus = string.Empty;
+        OnGoalSettingsChanged();
+    }
+
+    private void OnGoalSettingsChanged()
+    {
+        OnPropertyChanged(nameof(GoalTargetNetWpm));
+        OnPropertyChanged(nameof(GoalTargetAccuracyPercent));
+        OnPropertyChanged(nameof(GoalWeeklyPracticeMinutes));
+        OnPropertyChanged(nameof(GoalCurrentNetWpmText));
+        OnPropertyChanged(nameof(GoalTargetNetWpmText));
+        OnPropertyChanged(nameof(GoalWpmGapText));
+        OnPropertyChanged(nameof(GoalTargetAccuracyText));
+        OnPropertyChanged(nameof(GoalWeeklyPracticeText));
+        OnPropertyChanged(nameof(GoalWeeklyProgressText));
+        OnPropertyChanged(nameof(GoalActionSteps));
+    }
+
+    private static int ClampToInt(double value, int minimum, int maximum)
+    {
+        if (double.IsNaN(value))
+        {
+            return minimum;
+        }
+
+        return Math.Clamp((int)Math.Round(value), minimum, maximum);
+    }
+
     private void OnSnapshotChanged()
     {
         OnPropertyChanged(nameof(Snapshot));
         OnPropertyChanged(nameof(HasData));
         OnPropertyChanged(nameof(EmptyStateVisibility));
         OnPropertyChanged(nameof(DashboardContentVisibility));
+        OnPropertyChanged(nameof(GoalPanelVisibility));
         OnPropertyChanged(nameof(SessionCountText));
         OnPropertyChanged(nameof(PracticeTimeText));
         OnPropertyChanged(nameof(AverageNetWpmText));
@@ -251,6 +405,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(SlowestCharacterRows));
         OnPropertyChanged(nameof(WeakestBigramRows));
         OnPropertyChanged(nameof(SlowestBigramRows));
+        OnGoalSettingsChanged();
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

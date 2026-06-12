@@ -2,7 +2,7 @@
     x:Class="TypingTrainer.App.Controls.BarChart"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid MinHeight="170">
+    <Grid MinHeight="230">
         <Canvas x:Name="ChartCanvas" SizeChanged="ChartCanvas_SizeChanged" />
         <TextBlock
             x:Name="EmptyText"

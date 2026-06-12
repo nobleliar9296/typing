@@ -13,11 +13,16 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
 
     private readonly SqliteConnectionFactory _connectionFactory;
     private readonly IUtcClock _clock;
+    private readonly TimeZoneInfo _localTimeZone;
 
-    public AnalyticsQueryService(SqliteConnectionFactory connectionFactory, IUtcClock? clock = null)
+    public AnalyticsQueryService(
+        SqliteConnectionFactory connectionFactory,
+        IUtcClock? clock = null,
+        TimeZoneInfo? localTimeZone = null)
     {
         _connectionFactory = connectionFactory;
         _clock = clock ?? new SystemUtcClock();
+        _localTimeZone = localTimeZone ?? TimeZoneInfo.Local;
     }
 
     public async Task<DashboardSnapshot> GetDashboardSnapshotAsync(
@@ -37,7 +42,7 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
 
         return new DashboardSnapshot(
             BuildSummary(filteredSessions),
-            BuildDailyMetrics(filteredSessions),
+            BuildDailyMetrics(filteredSessions, _localTimeZone),
             BuildRecentSessions(filteredSessions),
             characterRows
                 .OrderByDescending(row => row.WeaknessScore)
@@ -73,8 +78,13 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
         }
 
         var days = range == AnalyticsRange.Last7Days ? 7 : 30;
-        var startUtc = _clock.UtcNow.AddDays(-days);
-        return sessions.Where(session => session.StartedAtUtc >= startUtc);
+        var todayLocal = ToLocalDate(_clock.UtcNow, _localTimeZone);
+        var startLocal = todayLocal.AddDays(-(days - 1));
+        return sessions.Where(session =>
+        {
+            var sessionDate = ToLocalDate(session.StartedAtUtc, _localTimeZone);
+            return sessionDate >= startLocal && sessionDate <= todayLocal;
+        });
     }
 
     private static DashboardSummary BuildSummary(IReadOnlyList<SessionRow> sessions)
@@ -118,10 +128,12 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
             sessions.Sum(session => session.UncorrectedErrors));
     }
 
-    private static IReadOnlyList<DailyMetricPoint> BuildDailyMetrics(IReadOnlyList<SessionRow> sessions)
+    private static IReadOnlyList<DailyMetricPoint> BuildDailyMetrics(
+        IReadOnlyList<SessionRow> sessions,
+        TimeZoneInfo localTimeZone)
     {
         return sessions
-            .GroupBy(session => DateOnly.FromDateTime(session.StartedAtUtc.UtcDateTime))
+            .GroupBy(session => ToLocalDate(session.StartedAtUtc, localTimeZone))
             .OrderBy(group => group.Key)
             .Select(group =>
             {
@@ -275,6 +287,11 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
     private static double Divide(int numerator, int denominator)
     {
         return denominator == 0 ? 0 : numerator / (double)denominator;
+    }
+
+    private static DateOnly ToLocalDate(DateTimeOffset timestampUtc, TimeZoneInfo localTimeZone)
+    {
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timestampUtc, localTimeZone).DateTime);
     }
 
     private sealed record SessionRow(

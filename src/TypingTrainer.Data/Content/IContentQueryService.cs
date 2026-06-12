@@ -9,6 +9,10 @@ public interface IContentQueryService
         ParagraphPracticeQuery query,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PracticeContentItem>> GetParagraphsAsync(
+        ParagraphPracticeQuery query,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ContentPackRow>> GetContentPacksAsync(
         CancellationToken cancellationToken = default);
 

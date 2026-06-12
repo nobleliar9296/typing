@@ -14,7 +14,10 @@ public sealed record AppSettings(
     bool ShowVisualKeyboard,
     bool ShowFingerColors,
     bool ShowFingerLabels,
-    string VisualKeyboardLayout)
+    string VisualKeyboardLayout,
+    int GoalTargetNetWpm,
+    int GoalTargetAccuracyPercent,
+    int GoalWeeklyPracticeMinutes)
 {
     public const string AutoLessonMode = "Auto";
     public const string QwertyKeyboardLayout = "QWERTY";
@@ -33,5 +36,8 @@ public sealed record AppSettings(
         ShowVisualKeyboard: true,
         ShowFingerColors: true,
         ShowFingerLabels: false,
-        VisualKeyboardLayout: QwertyKeyboardLayout);
+        VisualKeyboardLayout: QwertyKeyboardLayout,
+        GoalTargetNetWpm: 60,
+        GoalTargetAccuracyPercent: 95,
+        GoalWeeklyPracticeMinutes: 75);
 }

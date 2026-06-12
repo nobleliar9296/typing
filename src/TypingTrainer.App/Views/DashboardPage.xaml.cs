@@ -12,7 +12,9 @@ public sealed partial class DashboardPage : Page
     public DashboardPage()
     {
         InitializeComponent();
-        ViewModel = new DashboardViewModel(App.Services.AnalyticsQueryService);
+        ViewModel = new DashboardViewModel(
+            App.Services.AnalyticsQueryService,
+            App.Services.AppSettingsRepository);
         DataContext = ViewModel;
     }
 
@@ -22,6 +24,11 @@ public sealed partial class DashboardPage : Page
     {
         _isLoaded = true;
         await ViewModel.LoadAsync();
+    }
+
+    private async void SaveGoalsButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.SaveGoalsAsync();
     }
 
     private void PracticeButton_Click(object sender, RoutedEventArgs e)

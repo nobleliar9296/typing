@@ -11,6 +11,11 @@ namespace TypingTrainer.Data.Tests;
 public sealed class AnalyticsQueryServiceTests
 {
     private static readonly DateTimeOffset NowUtc = new(2026, 6, 11, 12, 0, 0, TimeSpan.Zero);
+    private static readonly TimeZoneInfo FixedCentralTime = TimeZoneInfo.CreateCustomTimeZone(
+        "FixedCentral",
+        TimeSpan.FromHours(-5),
+        "FixedCentral",
+        "FixedCentral");
 
     [TestMethod]
     public async Task AnalyticsQueryService_GetDashboardSnapshot_WithNoSessions_ReturnsEmptySnapshot()
@@ -57,6 +62,21 @@ public sealed class AnalyticsQueryServiceTests
         Assert.AreEqual(2, snapshot.DailyMetrics[0].SessionCount);
         Assert.AreEqual(50, snapshot.DailyMetrics[0].AverageNetWpm, 0.0001);
         Assert.AreEqual(new DateOnly(2026, 6, 11), snapshot.DailyMetrics[1].Date);
+    }
+
+    [TestMethod]
+    public async Task AnalyticsQueryService_GetDashboardSnapshot_GroupsDailyMetricsByLocalDate()
+    {
+        var nowUtc = new DateTimeOffset(2026, 6, 12, 4, 0, 0, TimeSpan.Zero);
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(nowUtc, FixedCentralTime);
+        await database.SaveAsync(CreateSession(
+            startedAtUtc: new DateTimeOffset(2026, 6, 12, 2, 30, 0, TimeSpan.Zero),
+            netWpm: 42));
+
+        var snapshot = await database.Analytics.GetDashboardSnapshotAsync(AnalyticsRange.Last7Days);
+
+        Assert.AreEqual(1, snapshot.DailyMetrics.Count);
+        Assert.AreEqual(new DateOnly(2026, 6, 11), snapshot.DailyMetrics[0].Date);
     }
 
     [TestMethod]
@@ -161,6 +181,20 @@ public sealed class AnalyticsQueryServiceTests
     }
 
     [TestMethod]
+    public async Task AnalyticsQueryService_GetDashboardSnapshot_Last7DaysUsesLocalCalendarDates()
+    {
+        var nowUtc = new DateTimeOffset(2026, 6, 12, 4, 0, 0, TimeSpan.Zero);
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(nowUtc, FixedCentralTime);
+        await database.SaveAsync(CreateSession(startedAtUtc: LocalToUtc(2026, 6, 4, 10, 0)));
+        await database.SaveAsync(CreateSession(startedAtUtc: LocalToUtc(2026, 6, 5, 10, 0)));
+
+        var snapshot = await database.Analytics.GetDashboardSnapshotAsync(AnalyticsRange.Last7Days);
+
+        Assert.AreEqual(1, snapshot.Summary.SessionCount);
+        Assert.AreEqual(new DateOnly(2026, 6, 5), snapshot.DailyMetrics.Single().Date);
+    }
+
+    [TestMethod]
     public async Task AnalyticsQueryService_GetDashboardSnapshot_RespectsLast30DaysRange()
     {
         await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
@@ -171,6 +205,20 @@ public sealed class AnalyticsQueryServiceTests
         var snapshot = await database.Analytics.GetDashboardSnapshotAsync(AnalyticsRange.Last30Days);
 
         Assert.AreEqual(2, snapshot.Summary.SessionCount);
+    }
+
+    [TestMethod]
+    public async Task AnalyticsQueryService_GetDashboardSnapshot_Last30DaysUsesLocalCalendarDates()
+    {
+        var nowUtc = new DateTimeOffset(2026, 6, 12, 4, 0, 0, TimeSpan.Zero);
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(nowUtc, FixedCentralTime);
+        await database.SaveAsync(CreateSession(startedAtUtc: LocalToUtc(2026, 5, 12, 10, 0)));
+        await database.SaveAsync(CreateSession(startedAtUtc: LocalToUtc(2026, 5, 13, 10, 0)));
+
+        var snapshot = await database.Analytics.GetDashboardSnapshotAsync(AnalyticsRange.Last30Days);
+
+        Assert.AreEqual(1, snapshot.Summary.SessionCount);
+        Assert.AreEqual(new DateOnly(2026, 5, 13), snapshot.DailyMetrics.Single().Date);
     }
 
     private static StoredPracticeSession CreateSession(
@@ -233,6 +281,12 @@ public sealed class AnalyticsQueryServiceTests
             deltaPreviousMs);
     }
 
+    private static DateTimeOffset LocalToUtc(int year, int month, int day, int hour, int minute)
+    {
+        return new DateTimeOffset(year, month, day, hour, minute, 0, FixedCentralTime.BaseUtcOffset)
+            .ToUniversalTime();
+    }
+
     private sealed class AnalyticsTestDatabase : IAsyncDisposable
     {
         private AnalyticsTestDatabase(
@@ -251,7 +305,9 @@ public sealed class AnalyticsQueryServiceTests
 
         public AnalyticsQueryService Analytics { get; }
 
-        public static async Task<AnalyticsTestDatabase> CreateInitializedAsync(DateTimeOffset nowUtc)
+        public static async Task<AnalyticsTestDatabase> CreateInitializedAsync(
+            DateTimeOffset nowUtc,
+            TimeZoneInfo? localTimeZone = null)
         {
             var directoryPath = Path.Combine(Path.GetTempPath(), "TypingTrainer.Tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directoryPath);
@@ -261,7 +317,10 @@ public sealed class AnalyticsQueryServiceTests
             await initializer.InitializeAsync();
 
             var repository = new PracticeSessionRepository(connectionFactory);
-            var analytics = new AnalyticsQueryService(connectionFactory, new FixedUtcClock(nowUtc));
+            var analytics = new AnalyticsQueryService(
+                connectionFactory,
+                new FixedUtcClock(nowUtc),
+                localTimeZone ?? TimeZoneInfo.Utc);
 
             return new AnalyticsTestDatabase(directoryPath, repository, analytics);
         }

@@ -24,9 +24,15 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private LessonGenerationResult _currentLesson;
     private LessonMode _activeLessonMode = LessonMode.Fixed;
     private LessonMode _selectedLessonMode = LessonMode.Adaptive;
+    private PracticeLessonSize _selectedLessonSize = PracticeLessonSize.Small;
     private bool _completionQueued;
     private bool _isGeneratingLesson;
+    private bool _isPaused;
+    private bool _isStopped;
+    private long? _lastEscapeTimestampTicks;
+    private int _sessionGeneration;
     private string _completionStatus = string.Empty;
+    private string _pauseStatus = string.Empty;
     private string _typingFeedback = string.Empty;
     private SessionSummary? _lastSummary;
     private AppSettings _settings = AppSettings.Defaults;
@@ -75,6 +81,19 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
                 _selectedLessonMode = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(LessonTitle));
+            }
+        }
+    }
+
+    public PracticeLessonSize SelectedLessonSize
+    {
+        get => _selectedLessonSize;
+        private set
+        {
+            if (_selectedLessonSize != value)
+            {
+                _selectedLessonSize = value;
+                OnPropertyChanged();
             }
         }
     }
@@ -131,7 +150,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool IsInputEnabled => !IsGeneratingLesson && !_completionQueued;
+    public bool IsInputEnabled => !IsGeneratingLesson;
 
     public Visibility CompletionPanelVisibility => _completionQueued
         ? Visibility.Visible
@@ -165,6 +184,37 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     }
 
     public Visibility TypingFeedbackVisibility => string.IsNullOrWhiteSpace(TypingFeedback)
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+
+    public bool IsPaused
+    {
+        get => _isPaused;
+        private set
+        {
+            if (_isPaused != value)
+            {
+                _isPaused = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public string PauseStatus
+    {
+        get => _pauseStatus;
+        private set
+        {
+            if (_pauseStatus != value)
+            {
+                _pauseStatus = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PauseOverlayVisibility));
+            }
+        }
+    }
+
+    public Visibility PauseOverlayVisibility => string.IsNullOrWhiteSpace(PauseStatus)
         ? Visibility.Collapsed
         : Visibility.Visible;
 
@@ -211,6 +261,12 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         await GenerateNextLessonAsync(cancellationToken);
     }
 
+    public async Task ChangeLessonSizeAsync(PracticeLessonSize size, CancellationToken cancellationToken = default)
+    {
+        SelectedLessonSize = size;
+        await GenerateNextLessonAsync(cancellationToken);
+    }
+
     public async Task GenerateNextLessonAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -218,7 +274,13 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             IsGeneratingLesson = true;
             CompletionStatus = "Generating lesson...";
             _settings = await _lessonService.GetSettingsAsync(cancellationToken);
-            var lesson = await _lessonService.GenerateNextLessonAsync(SelectedLessonMode, cancellationToken);
+            var targetCharacters = PracticeLessonSizeTargets.GetTargetCharacters(
+                SelectedLessonSize,
+                _settings.LessonLengthCharacters);
+            var lesson = await _lessonService.GenerateNextLessonAsync(
+                SelectedLessonMode,
+                targetCharacters,
+                cancellationToken);
             StartSession(lesson, SelectedLessonMode);
         }
         finally
@@ -235,6 +297,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     private void StartSession(LessonGenerationResult lesson, LessonMode mode)
     {
+        _sessionGeneration++;
         _currentLesson = lesson;
         _activeLessonMode = mode;
         _session = new TypingSession(string.IsNullOrWhiteSpace(lesson.Text)
@@ -242,8 +305,12 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             : lesson.Text,
             CreateTypingSessionOptions());
         _completionQueued = false;
+        IsPaused = false;
+        _isStopped = false;
+        _lastEscapeTimestampTicks = null;
         _lastSummary = null;
         CompletionStatus = string.Empty;
+        PauseStatus = string.Empty;
         TypingFeedback = string.Empty;
         OnVisualKeyboardSettingsChanged();
         CurrentState = _session.GetSnapshot(Stopwatch.GetTimestamp());
@@ -253,11 +320,22 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public void HandleCharacter(char character)
     {
-        if (_completionQueued || IsGeneratingLesson)
+        if (IsGeneratingLesson)
         {
             return;
         }
 
+        if (_isStopped || _completionQueued || CurrentState.IsComplete)
+        {
+            StartSession(_currentLesson, _activeLessonMode);
+        }
+
+        if (IsPaused)
+        {
+            return;
+        }
+
+        _lastEscapeTimestampTicks = null;
         var result = _session.ProcessCharacter(character, Stopwatch.GetTimestamp());
         CurrentState = result.State;
         TypingFeedback = result.WasRejected
@@ -267,21 +345,54 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         if (result.State.IsComplete && !_completionQueued)
         {
             _completionQueued = true;
+            var completedSession = _session;
+            var completedGeneration = _sessionGeneration;
+            var completedMode = _activeLessonMode;
             OnCompletionChanged();
-            _ = CompleteAndQueueSessionAsync();
+            _ = CompleteAndQueueSessionAsync(completedSession, completedGeneration, completedMode);
         }
     }
 
     public void HandleBackspace()
     {
-        if (_completionQueued || IsGeneratingLesson)
+        if (_completionQueued || IsGeneratingLesson || IsPaused || _isStopped)
         {
             return;
         }
 
+        _lastEscapeTimestampTicks = null;
         var result = _session.ProcessBackspace(Stopwatch.GetTimestamp());
         CurrentState = result.State;
         TypingFeedback = result.WasAccepted ? string.Empty : result.FeedbackMessage ?? string.Empty;
+    }
+
+    public void HandleEscape(long timestampTicks)
+    {
+        if (IsGeneratingLesson)
+        {
+            return;
+        }
+
+        if (_lastEscapeTimestampTicks is long lastEscapeTicks
+            && GetElapsedMilliseconds(lastEscapeTicks, timestampTicks) <= 1_000)
+        {
+            StopCurrentSession();
+            return;
+        }
+
+        _lastEscapeTimestampTicks = timestampTicks;
+        if (IsPaused)
+        {
+            IsPaused = false;
+            PauseStatus = string.Empty;
+            TypingFeedback = string.Empty;
+        }
+        else
+        {
+            IsPaused = true;
+            PauseStatus = "Paused. Press Esc to resume, or Esc twice to end.";
+            TypingFeedback = string.Empty;
+        }
     }
 
     public SessionSummary CompleteSession()
@@ -292,33 +403,41 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         return summary;
     }
 
-    private async Task CompleteAndQueueSessionAsync()
+    private async Task CompleteAndQueueSessionAsync(
+        TypingSession completedSession,
+        int completedGeneration,
+        LessonMode completedMode)
     {
         try
         {
-            CompletionStatus = "Session complete. Saving locally...";
-            var summary = CompleteSession();
-            var events = _session.GetEvents();
-            _lastSummary = summary;
-            OnCompletionChanged();
+            SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Saving locally...");
+            var timestampTicks = Stopwatch.GetTimestamp();
+            var summary = completedSession.Complete(timestampTicks);
+            var events = completedSession.GetEvents();
+            if (IsCurrentCompletion(completedGeneration))
+            {
+                CurrentState = completedSession.GetSnapshot(timestampTicks);
+                _lastSummary = summary;
+                OnCompletionChanged();
+            }
 
             if (_settings.AutoSaveCompletedSessions)
             {
                 await _sessionPersistenceQueue.EnqueueCompletedSessionAsync(
                     summary,
                     events,
-                    _activeLessonMode.ToString());
+                    completedMode.ToString());
 
-                CompletionStatus = "Session complete. Queued for local save.";
+                SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Queued for local save.");
             }
             else
             {
-                CompletionStatus = "Session complete. Auto-save is off.";
+                SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Auto-save is off.");
             }
         }
         catch
         {
-            CompletionStatus = "Session complete. Local save could not be queued.";
+            SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Local save could not be queued.");
         }
     }
 
@@ -404,6 +523,38 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
                 ? ErrorAdvanceMode.RequireCorrectKey
                 : ErrorAdvanceMode.AdvanceOnError,
             _settings.BackspaceAllowed);
+    }
+
+    private void StopCurrentSession()
+    {
+        _completionQueued = false;
+        _lastSummary = null;
+        _lastEscapeTimestampTicks = null;
+        IsPaused = false;
+        _isStopped = true;
+        PauseStatus = "Session ended. Press any key to restart.";
+        CompletionStatus = string.Empty;
+        TypingFeedback = string.Empty;
+        OnCompletionChanged();
+        OnPropertyChanged(nameof(IsInputEnabled));
+    }
+
+    private bool IsCurrentCompletion(int completedGeneration)
+    {
+        return completedGeneration == _sessionGeneration && _completionQueued;
+    }
+
+    private void SetCompletionStatusIfCurrent(int completedGeneration, string status)
+    {
+        if (IsCurrentCompletion(completedGeneration))
+        {
+            CompletionStatus = status;
+        }
+    }
+
+    private static double GetElapsedMilliseconds(long startTicks, long endTicks)
+    {
+        return (endTicks - startTicks) * 1_000.0 / Stopwatch.Frequency;
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

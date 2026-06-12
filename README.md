@@ -93,6 +93,7 @@ Settings are stored locally in SQLite and include:
 
 - default lesson mode
 - lesson length
+- practice lesson size override on the Practice screen
 - backspace behavior
 - auto-save behavior
 - strict accuracy mode
@@ -197,6 +198,16 @@ Built-in paragraphs are local, original practice text. Imported paragraphs stay 
 - Review: balanced practice from unlocked characters.
 - Fixed: the original fixed sample sentence.
 
+## Long Practice
+
+The Practice screen has a lesson size selector:
+
+- Small: the current short paragraph-sized practice.
+- Medium: about 250 words.
+- Long: about 1000 words.
+
+Long paragraph lessons are assembled from multiple imported or built-in paragraph chunks when available. The practice text area scrolls inside the typing surface so the visual keyboard stays below it.
+
 ## Manual Checks
 
 - The app launches to the practice screen.
@@ -208,6 +219,9 @@ Built-in paragraphs are local, original practice text. Imported paragraphs stay 
 - Backspace removes the previous typed character and allows correction.
 - WPM, accuracy, elapsed time, and unresolved errors update live.
 - `Ctrl+R` restarts the current lesson.
+- `Esc` pauses or resumes the active lesson.
+- Pressing `Esc` twice within one second ends the active incomplete session without saving it.
+- After a completed or stopped session, typing a printable key restarts the current lesson and processes that key.
 - Next Lesson regenerates the selected lesson mode.
 - Settings opens and persists local preferences.
 - The visual keyboard appears below the practice text and highlights the current expected key.
