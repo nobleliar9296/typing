@@ -15,6 +15,7 @@ TestResults/
 *.nupkg
 *.snupkg
 packages/
+artifacts/
 
 # Local app/runtime data
 *.db
