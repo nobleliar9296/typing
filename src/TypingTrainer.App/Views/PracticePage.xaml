@@ -27,8 +27,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Grid
@@ -45,22 +43,6 @@
                     <ColumnDefinition x:Name="HeaderSpacerColumn" Width="*" />
                     <ColumnDefinition x:Name="HeaderControlsColumn" Width="Auto" />
                 </Grid.ColumnDefinitions>
-
-                <StackPanel
-                    x:Name="TitlePanel"
-                    Spacing="2">
-                    <TextBlock
-                        x:Name="TitleText"
-                        Text="TypingTrainer"
-                        FontSize="28"
-                        FontWeight="SemiBold" />
-                    <TextBlock
-                        x:Name="LessonTitleText"
-                        Text="{Binding LessonTitle}"
-                        TextTrimming="CharacterEllipsis"
-                        MaxLines="1"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                </StackPanel>
 
                 <StackPanel
                     x:Name="LessonSelectorsPanel"
@@ -146,69 +128,6 @@
                     Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
             </Grid>
 
-            <Grid
-                x:Name="StatsGrid"
-                Grid.Row="2"
-                ColumnSpacing="8"
-                RowSpacing="8"
-                HorizontalAlignment="Stretch">
-                <Grid.RowDefinitions>
-                    <RowDefinition x:Name="KpiRow0" Height="Auto" />
-                    <RowDefinition x:Name="KpiRow1" Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="KpiColumn0" Width="*" />
-                    <ColumnDefinition x:Name="KpiColumn1" Width="*" />
-                    <ColumnDefinition x:Name="KpiColumn2" Width="*" />
-                    <ColumnDefinition x:Name="KpiColumn3" Width="*" />
-                    <ColumnDefinition x:Name="KpiColumn4" Width="*" />
-                    <ColumnDefinition x:Name="KpiColumn5" Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Border x:Name="RawWpmTile" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                    <StackPanel Spacing="2">
-                        <TextBlock x:Name="RawWpmLabelText" Text="Raw WPM" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="RawWpmValueText" Text="{Binding RawWpmText}" FontSize="24" FontWeight="SemiBold" />
-                    </StackPanel>
-                </Border>
-                <Border x:Name="NetWpmTile" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                    <StackPanel Spacing="2">
-                        <TextBlock x:Name="NetWpmLabelText" Text="Net WPM" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="NetWpmValueText" Text="{Binding NetWpmText}" FontSize="24" FontWeight="SemiBold" />
-                    </StackPanel>
-                </Border>
-                <Border x:Name="AccuracyTile" Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                    <StackPanel Spacing="2">
-                        <TextBlock x:Name="AccuracyLabelText" Text="Accuracy" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="AccuracyValueText" Text="{Binding AccuracyText}" FontSize="24" FontWeight="SemiBold" />
-                    </StackPanel>
-                </Border>
-                <Border x:Name="ElapsedTile" Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                    <StackPanel Spacing="2">
-                        <TextBlock x:Name="ElapsedLabelText" Text="Time" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="ElapsedValueText" Text="{Binding ElapsedText}" FontSize="24" FontWeight="SemiBold" />
-                    </StackPanel>
-                </Border>
-                <Border x:Name="ErrorsTile" Grid.Column="4" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                    <StackPanel Spacing="2">
-                        <TextBlock x:Name="ErrorsLabelText" Text="Errors" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="ErrorsValueText" Text="{Binding ErrorsText}" FontSize="24" FontWeight="SemiBold" />
-                    </StackPanel>
-                </Border>
-                <Border x:Name="ProgressTile" Grid.Column="5" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                    <StackPanel Spacing="2">
-                        <TextBlock x:Name="ProgressLabelText" Text="Progress" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="ProgressValueText" Text="{Binding ProgressText}" FontSize="24" FontWeight="SemiBold" />
-                        <TextBlock x:Name="CharactersText" Text="{Binding CharactersText}" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <ProgressBar
-                Grid.Row="3"
-                Maximum="100"
-                Value="{Binding ProgressPercent}"
-                Height="3" />
         </Grid>
 
         <StackPanel
@@ -218,8 +137,44 @@
             Spacing="18"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Top">
+            <Grid
+                x:Name="PracticeTypingGrid"
+                ColumnSpacing="12"
+                HorizontalAlignment="Stretch">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="LeftStatsColumn" Width="132" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="RightStatsColumn" Width="132" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel
+                    x:Name="LeftStatsPanel"
+                    Spacing="8"
+                    VerticalAlignment="Top">
+                    <Border x:Name="RawWpmTile" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="RawWpmLabelText" Text="Raw WPM" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="RawWpmValueText" Text="{Binding RawWpmText}" FontSize="24" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="NetWpmTile" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="NetWpmLabelText" Text="Net WPM" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="NetWpmValueText" Text="{Binding NetWpmText}" FontSize="24" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="AccuracyTile" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="AccuracyLabelText" Text="Accuracy" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="AccuracyValueText" Text="{Binding AccuracyText}" FontSize="24" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
             <controls:TypingInputSurface
                 x:Name="InputSurface"
+                Grid.Column="1"
+                Background="Transparent"
                 CharacterReceived="InputSurface_CharacterReceived"
                 KeyDown="InputSurface_KeyDown"
                 PointerPressed="InputSurface_PointerPressed"
@@ -229,16 +184,18 @@
                     MaxWidth="1100"
                     Padding="32"
                     HorizontalAlignment="Stretch"
+                    Background="Transparent"
                     BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
                     PointerPressed="InputSurface_PointerPressed"
                     Tapped="InputSurface_Tapped">
-                    <StackPanel Spacing="18">
+                    <StackPanel Spacing="12">
                         <ScrollViewer
                             x:Name="PracticeTextScrollViewer"
                             MinHeight="190"
                             MaxHeight="360"
+                            Background="Transparent"
                             HorizontalScrollBarVisibility="Disabled"
                             VerticalScrollBarVisibility="Auto"
                             PointerPressed="InputSurface_PointerPressed"
@@ -248,12 +205,11 @@
                                 FontFamilyName="{Binding PracticeFontFamily}"
                                 TextContrast="{Binding PracticeTextContrast}"
                                 CursorStyle="{Binding PracticeCursorStyle}"
+                                Background="Transparent"
+                                PointerPressed="InputSurface_PointerPressed"
+                                Tapped="InputSurface_Tapped"
                                 State="{Binding CurrentState}" />
                         </ScrollViewer>
-                        <TextBlock
-                            Text="{Binding PaceGuidanceText}"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            FontWeight="SemiBold" />
                         <TextBlock
                             Text="{Binding TypingFeedback}"
                             Visibility="{Binding TypingFeedbackVisibility}"
@@ -382,6 +338,32 @@
                     </StackPanel>
                 </Border>
             </controls:TypingInputSurface>
+                <StackPanel
+                    x:Name="RightStatsPanel"
+                    Grid.Column="2"
+                    Spacing="8"
+                    VerticalAlignment="Top">
+                    <Border x:Name="ElapsedTile" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="ElapsedLabelText" Text="Time" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="ElapsedValueText" Text="{Binding ElapsedText}" FontSize="24" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="ErrorsTile" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="ErrorsLabelText" Text="Errors" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="ErrorsValueText" Text="{Binding ErrorsText}" FontSize="24" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="ProgressTile" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="ProgressLabelText" Text="Progress" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="ProgressValueText" Text="{Binding ProgressText}" FontSize="24" FontWeight="SemiBold" />
+                            <TextBlock x:Name="CharactersText" Text="{Binding CharactersText}" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
             <controls:VisualKeyboardControl
                 x:Name="VisualKeyboard"
                 Layout="{Binding VisualKeyboardLayout}"

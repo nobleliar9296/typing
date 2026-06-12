@@ -62,19 +62,19 @@ public sealed partial class PracticePage : Page
         }
 
         ApplyResponsiveLayout(ActualWidth, ActualHeight);
-        InputSurface.Focus(FocusState.Programmatic);
-        QueueScrollToCursor();
+        FocusTypingSurface(FocusState.Programmatic);
+        QueueScrollToCursor(animate: false);
     }
 
     private void InputSurface_Tapped(object sender, TappedRoutedEventArgs e)
     {
-        InputSurface.Focus(FocusState.Pointer);
+        FocusTypingSurface(FocusState.Pointer);
         e.Handled = true;
     }
 
     private void InputSurface_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        InputSurface.Focus(FocusState.Pointer);
+        FocusTypingSurface(FocusState.Pointer);
     }
 
     private void InputSurface_CharacterReceived(UIElement sender, CharacterReceivedRoutedEventArgs args)
@@ -94,7 +94,7 @@ public sealed partial class PracticePage : Page
         if (args.Key == VirtualKey.Escape)
         {
             ViewModel.HandleEscape(Stopwatch.GetTimestamp());
-            InputSurface.Focus(FocusState.Programmatic);
+            FocusTypingSurface(FocusState.Programmatic);
             args.Handled = true;
         }
         else if (args.Key == VirtualKey.Back)
@@ -108,23 +108,23 @@ public sealed partial class PracticePage : Page
     private void RestartAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         ViewModel.StartNewLesson();
-        InputSurface.Focus(FocusState.Programmatic);
-        QueueScrollToCursor();
+        FocusTypingSurface(FocusState.Programmatic);
+        QueueScrollToCursor(animate: false);
         args.Handled = true;
     }
 
     private void RestartButton_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.StartNewLesson();
-        InputSurface.Focus(FocusState.Programmatic);
-        QueueScrollToCursor();
+        FocusTypingSurface(FocusState.Programmatic);
+        QueueScrollToCursor(animate: false);
     }
 
     private async void NextLessonButton_Click(object sender, RoutedEventArgs e)
     {
         await ViewModel.GenerateNextLessonAsync();
-        InputSurface.Focus(FocusState.Programmatic);
-        QueueScrollToCursor();
+        FocusTypingSurface(FocusState.Programmatic);
+        QueueScrollToCursor(animate: false);
     }
 
     private async void PracticeMistakesButton_Click(object sender, RoutedEventArgs e)
@@ -133,8 +133,8 @@ public sealed partial class PracticePage : Page
         _suppressLessonSelectionChanges = true;
         LessonModeComboBox.SelectedIndex = 4;
         _suppressLessonSelectionChanges = false;
-        InputSurface.Focus(FocusState.Programmatic);
-        QueueScrollToCursor();
+        FocusTypingSurface(FocusState.Programmatic);
+        QueueScrollToCursor(animate: false);
     }
 
     private async void ViewDashboardButton_Click(object sender, RoutedEventArgs e)
@@ -169,8 +169,8 @@ public sealed partial class PracticePage : Page
         };
 
         await ViewModel.ChangeLessonModeAsync(mode);
-        InputSurface.Focus(FocusState.Programmatic);
-        QueueScrollToCursor();
+        FocusTypingSurface(FocusState.Programmatic);
+        QueueScrollToCursor(animate: false);
     }
 
     private async void LessonSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -188,8 +188,8 @@ public sealed partial class PracticePage : Page
         };
 
         await ViewModel.ChangeLessonSizeAsync(size);
-        InputSurface.Focus(FocusState.Programmatic);
-        QueueScrollToCursor();
+        FocusTypingSurface(FocusState.Programmatic);
+        QueueScrollToCursor(animate: false);
     }
 
     private void PracticeRoot_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -201,7 +201,7 @@ public sealed partial class PracticePage : Page
     {
         if (!IsInteractiveElement(e.OriginalSource as DependencyObject))
         {
-            InputSurface.Focus(FocusState.Pointer);
+            FocusTypingSurface(FocusState.Pointer);
         }
     }
 
@@ -233,26 +233,28 @@ public sealed partial class PracticePage : Page
         var stackedSelectors = width < 760;
 
         var pageHorizontalPadding = Math.Clamp(32 * scale, 16, 32);
-        var pageTopPadding = Math.Clamp(24 * scale, 12, 28);
-        var pageBottomPadding = Math.Clamp(18 * scale, 8, 24);
+        var pageTopPadding = Math.Clamp(12 * scale, 8, 14);
         PracticeRoot.Padding = new Thickness(0);
         HeaderGrid.Margin = new Thickness(pageHorizontalPadding, pageTopPadding, pageHorizontalPadding, 0);
-        PracticeContentPanel.Margin = new Thickness(pageHorizontalPadding, 0, pageHorizontalPadding, pageBottomPadding);
-        PracticeRoot.RowSpacing = Math.Clamp(18 * scale, 10, 20);
+        PracticeContentPanel.Margin = new Thickness(pageHorizontalPadding, 0, pageHorizontalPadding, 0);
+        PracticeContentPanel.Spacing = Math.Clamp(12 * scale, 8, 14);
+        PracticeRoot.RowSpacing = Math.Clamp(10 * scale, 6, 12);
 
-        HeaderGrid.RowSpacing = Math.Clamp(10 * scale, 7, 12);
+        HeaderGrid.RowSpacing = Math.Clamp(7 * scale, 4, 8);
         HeaderTopGrid.ColumnSpacing = Math.Clamp(16 * scale, 10, 16);
-        HeaderTopGrid.RowSpacing = Math.Clamp(8 * scale, 6, 8);
+        HeaderTopGrid.RowSpacing = 0;
         LessonSelectorsPanel.Orientation = stackedSelectors ? Orientation.Vertical : Orientation.Horizontal;
         LessonSelectorsPanel.Spacing = stackedSelectors ? Math.Clamp(7 * scale, 5, 8) : Math.Clamp(14 * scale, 9, 14);
 
-        ArrangeHeaderTop(compactHeader, veryCompactHeader);
+        ArrangeHeaderTop(stackedSelectors);
         ArrangeContext(compactHeader, veryCompactHeader);
-        ArrangeKpis(compactHeader, scale);
+        ArrangeStatsColumns(width, scale);
         SetHeaderTypography(scale);
         SetKpiTileSizing(scale);
 
-        InputBorder.Padding = new Thickness(Math.Clamp(32 * scale, 16, 32));
+        var inputHorizontalPadding = Math.Clamp(28 * scale, 14, 28);
+        var inputTopPadding = Math.Clamp(24 * scale, 12, 24);
+        InputBorder.Padding = new Thickness(inputHorizontalPadding, inputTopPadding, inputHorizontalPadding, 0);
         InputBorder.MaxWidth = width < 1200 ? double.PositiveInfinity : 1100;
         PracticeTextPresenter.DisplayScale = scale * ViewModel.PracticeTextScale;
         PracticeTextPresenter.MaxWidth = ViewModel.PracticeLineWidthMax;
@@ -261,64 +263,39 @@ public sealed partial class PracticePage : Page
 
         var headerHeight = HeaderGrid.ActualHeight > 0
             ? HeaderGrid.ActualHeight
-            : compactHeader ? 245 * scale : 178 * scale;
+            : compactHeader ? 92 * scale : 58 * scale;
         var keyboardHeightEstimate = (306 * keyboardScale) + 18;
-        var statusAllowance = 62 * scale;
+        var statusAllowance = 34 * scale;
         var availableTextHeight = height
             - 43
             - HeaderGrid.Margin.Top
-            - PracticeContentPanel.Margin.Bottom
             - PracticeRoot.RowSpacing
             - headerHeight
             - keyboardHeightEstimate
             - statusAllowance;
-        var maxTextHeight = Math.Clamp(availableTextHeight, 120, height < 900 ? 300 : 360);
+        var fourLineTextHeight = 4 * 48 * PracticeTextPresenter.DisplayScale;
+        var maxTextHeight = Math.Clamp(
+            availableTextHeight,
+            fourLineTextHeight,
+            Math.Max(fourLineTextHeight, height < 900 ? 300 : 360));
         PracticeTextScrollViewer.MaxHeight = maxTextHeight;
-        PracticeTextScrollViewer.MinHeight = Math.Min(maxTextHeight, Math.Clamp(190 * scale, 120, 190));
+        PracticeTextScrollViewer.MinHeight = Math.Min(maxTextHeight, fourLineTextHeight);
     }
 
-    private void ArrangeHeaderTop(bool compactHeader, bool veryCompactHeader)
+    private void ArrangeHeaderTop(bool stackedSelectors)
     {
-        if (veryCompactHeader)
-        {
-            HeaderSpacerColumn.Width = new GridLength(0);
-            HeaderControlsColumn.Width = new GridLength(1, GridUnitType.Star);
-
-            Grid.SetRow(TitlePanel, 0);
-            Grid.SetColumn(TitlePanel, 0);
-            Grid.SetColumnSpan(TitlePanel, 3);
-            Grid.SetRow(LessonSelectorsPanel, 1);
-            Grid.SetColumn(LessonSelectorsPanel, 0);
-            Grid.SetColumnSpan(LessonSelectorsPanel, 3);
-            LessonSelectorsPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
-            return;
-        }
-
-        if (compactHeader)
-        {
-            HeaderSpacerColumn.Width = new GridLength(1, GridUnitType.Star);
-            HeaderControlsColumn.Width = GridLength.Auto;
-
-            Grid.SetRow(TitlePanel, 0);
-            Grid.SetColumn(TitlePanel, 0);
-            Grid.SetColumnSpan(TitlePanel, 3);
-            Grid.SetRow(LessonSelectorsPanel, 1);
-            Grid.SetColumn(LessonSelectorsPanel, 2);
-            Grid.SetColumnSpan(LessonSelectorsPanel, 1);
-            LessonSelectorsPanel.HorizontalAlignment = HorizontalAlignment.Right;
-            return;
-        }
-
+        HeaderTitleColumn.Width = new GridLength(0);
         HeaderSpacerColumn.Width = new GridLength(1, GridUnitType.Star);
-        HeaderControlsColumn.Width = GridLength.Auto;
+        HeaderControlsColumn.Width = stackedSelectors
+            ? new GridLength(1, GridUnitType.Star)
+            : GridLength.Auto;
 
-        Grid.SetRow(TitlePanel, 0);
-        Grid.SetColumn(TitlePanel, 0);
-        Grid.SetColumnSpan(TitlePanel, 1);
         Grid.SetRow(LessonSelectorsPanel, 0);
-        Grid.SetColumn(LessonSelectorsPanel, 2);
-        Grid.SetColumnSpan(LessonSelectorsPanel, 1);
-        LessonSelectorsPanel.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid.SetColumn(LessonSelectorsPanel, stackedSelectors ? 0 : 2);
+        Grid.SetColumnSpan(LessonSelectorsPanel, stackedSelectors ? 3 : 1);
+        LessonSelectorsPanel.HorizontalAlignment = stackedSelectors
+            ? HorizontalAlignment.Stretch
+            : HorizontalAlignment.Right;
     }
 
     private void ArrangeContext(bool compactHeader, bool veryCompactHeader)
@@ -366,33 +343,19 @@ public sealed partial class PracticePage : Page
         Grid.SetColumnSpan(element, columnSpan);
     }
 
-    private void ArrangeKpis(bool compactHeader, double scale)
+    private void ArrangeStatsColumns(double width, double scale)
     {
-        var columns = compactHeader ? 3 : 6;
-        var columnDefinitions = new[] { KpiColumn0, KpiColumn1, KpiColumn2, KpiColumn3, KpiColumn4, KpiColumn5 };
-        for (var index = 0; index < columnDefinitions.Length; index++)
-        {
-            columnDefinitions[index].Width = index < columns
-                ? new GridLength(1, GridUnitType.Star)
-                : new GridLength(0);
-        }
-
-        KpiRow1.Height = compactHeader ? GridLength.Auto : new GridLength(0);
-        StatsGrid.ColumnSpacing = Math.Clamp(8 * scale, 5, 8);
-        StatsGrid.RowSpacing = compactHeader ? Math.Clamp(8 * scale, 5, 8) : 0;
-
-        var tiles = new[] { RawWpmTile, NetWpmTile, AccuracyTile, ElapsedTile, ErrorsTile, ProgressTile };
-        for (var index = 0; index < tiles.Length; index++)
-        {
-            Grid.SetRow(tiles[index], compactHeader ? index / 3 : 0);
-            Grid.SetColumn(tiles[index], compactHeader ? index % 3 : index);
-        }
+        var minimumRailWidth = width < 820 ? 92 : 108;
+        var statsWidth = Math.Clamp(132 * scale, minimumRailWidth, 132);
+        LeftStatsColumn.Width = new GridLength(statsWidth);
+        RightStatsColumn.Width = new GridLength(statsWidth);
+        PracticeTypingGrid.ColumnSpacing = Math.Clamp(12 * scale, 8, 14);
+        LeftStatsPanel.Spacing = Math.Clamp(8 * scale, 5, 8);
+        RightStatsPanel.Spacing = Math.Clamp(8 * scale, 5, 8);
     }
 
     private void SetHeaderTypography(double scale)
     {
-        TitleText.FontSize = Math.Clamp(28 * scale, 22, 28);
-        LessonTitleText.FontSize = Math.Clamp(14 * scale, 12, 14);
         LessonReasonText.FontSize = Math.Clamp(14 * scale, 12, 14);
         FocusKeysText.FontSize = Math.Clamp(14 * scale, 12, 14);
         FocusBigramsText.FontSize = Math.Clamp(14 * scale, 12, 14);
@@ -413,12 +376,17 @@ public sealed partial class PracticePage : Page
     {
         foreach (var tile in new[] { RawWpmTile, NetWpmTile, AccuracyTile, ElapsedTile, ErrorsTile, ProgressTile })
         {
-            tile.Padding = new Thickness(Math.Clamp(12 * scale, 8, 12), Math.Clamp(10 * scale, 7, 10), Math.Clamp(12 * scale, 8, 12), Math.Clamp(10 * scale, 7, 10));
-            tile.MinHeight = Math.Clamp(68 * scale, 54, 68);
+            tile.Padding = new Thickness(Math.Clamp(10 * scale, 6, 10), Math.Clamp(8 * scale, 5, 8), Math.Clamp(10 * scale, 6, 10), Math.Clamp(8 * scale, 5, 8));
+            tile.MinHeight = Math.Clamp(58 * scale, 48, 58);
         }
     }
 
-    private void QueueScrollToCursor()
+    private void FocusTypingSurface(FocusState focusState)
+    {
+        InputSurface.Focus(focusState);
+    }
+
+    private void QueueScrollToCursor(bool animate = true)
     {
         DispatcherQueue.TryEnqueue(() =>
         {
@@ -428,7 +396,13 @@ public sealed partial class PracticePage : Page
                 cursorOffset - viewportAnchor,
                 0,
                 Math.Max(0, PracticeTextScrollViewer.ScrollableHeight));
-            PracticeTextScrollViewer.ChangeView(null, offset, null, disableAnimation: true);
+
+            if (Math.Abs(PracticeTextScrollViewer.VerticalOffset - offset) < 0.5)
+            {
+                return;
+            }
+
+            PracticeTextScrollViewer.ChangeView(null, offset, null, disableAnimation: !animate);
         });
     }
 
