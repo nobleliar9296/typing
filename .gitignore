@@ -1,0 +1,29 @@
+# Build output
+bin/
+obj/
+TestResults/
+
+# Visual Studio / VS Code user state
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vscode/*.user
+
+# .NET artifacts
+*.nupkg
+*.snupkg
+packages/
+
+# Local app/runtime data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+logs/
+
+# OS files
+Thumbs.db
+Desktop.ini

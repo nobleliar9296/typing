@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Restore",
+      "type": "shell",
+      "command": "& 'C:\\Program Files (x86)\\dotnet\\dotnet.exe' restore TypingTrainer.sln",
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "Build",
+      "type": "shell",
+      "command": "& 'C:\\Program Files (x86)\\dotnet\\dotnet.exe' build TypingTrainer.sln --no-restore",
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOn": "Restore"
+    },
+    {
+      "label": "Test",
+      "type": "shell",
+      "command": "& 'C:\\Program Files (x86)\\dotnet\\dotnet.exe' test TypingTrainer.sln --arch x64",
+      "problemMatcher": "$msCompile",
+      "group": "test"
+    },
+    {
+      "label": "Run App",
+      "type": "shell",
+      "command": "& 'C:\\Program Files (x86)\\dotnet\\dotnet.exe' run --project .\\src\\TypingTrainer.App\\TypingTrainer.App.csproj -c Debug -r win-x64",
+      "problemMatcher": "$msCompile",
+      "dependsOn": "Build"
+    }
+  ]
+}
