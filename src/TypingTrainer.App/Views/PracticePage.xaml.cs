@@ -79,6 +79,12 @@ public sealed partial class PracticePage : Page
 
     private void InputSurface_CharacterReceived(UIElement sender, CharacterReceivedRoutedEventArgs args)
     {
+        if (ViewModel.ReviewPopupVisibility == Visibility.Visible)
+        {
+            args.Handled = true;
+            return;
+        }
+
         var character = (char)args.Character;
 
         if (!char.IsControl(character))
@@ -91,6 +97,12 @@ public sealed partial class PracticePage : Page
 
     private void InputSurface_KeyDown(object sender, KeyRoutedEventArgs args)
     {
+        if (ViewModel.ReviewPopupVisibility == Visibility.Visible)
+        {
+            args.Handled = true;
+            return;
+        }
+
         if (args.Key == VirtualKey.Escape)
         {
             ViewModel.HandleEscape(Stopwatch.GetTimestamp());
@@ -199,6 +211,11 @@ public sealed partial class PracticePage : Page
 
     private void PracticeRoot_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
+        if (ViewModel.ReviewPopupVisibility == Visibility.Visible)
+        {
+            return;
+        }
+
         if (!IsInteractiveElement(e.OriginalSource as DependencyObject))
         {
             FocusTypingSurface(FocusState.Pointer);

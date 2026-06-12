@@ -21,6 +21,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private readonly SessionReviewGenerator _reviewGenerator = new();
     private readonly ICharacterToKeyMapper _keyMapper = new QwertyCharacterToKeyMapper();
     private readonly VisualKeyboardLayout _visualKeyboardLayout = QwertyVisualKeyboardLayout.Create();
+    private readonly List<SessionNetWpmSample> _sessionNetWpmSamples = [];
     private TypingSession _session;
     private TypingStateSnapshot _currentState;
     private LessonGenerationResult _currentLesson;
@@ -193,11 +194,13 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool IsInputEnabled => !IsGeneratingLesson;
+    public bool IsInputEnabled => !IsGeneratingLesson && !_completionQueued;
 
-    public Visibility CompletionPanelVisibility => _completionQueued
+    public Visibility ReviewPopupVisibility => _completionQueued
         ? Visibility.Visible
         : Visibility.Collapsed;
+
+    public double PracticeContentOpacity => _completionQueued ? 0.38 : 1.0;
 
     public string CompletionStatus
     {
@@ -311,6 +314,16 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public string CompletionErrorsText => (_lastSummary?.CurrentErrors ?? 0).ToString(CultureInfo.InvariantCulture);
 
+    public IReadOnlyList<ChartPointViewModel> SessionNetWpmPoints => _sessionNetWpmSamples
+        .Select(sample => new ChartPointViewModel(
+            FormatElapsedLabel(sample.ElapsedMs),
+            sample.NetWpm))
+        .ToArray();
+
+    public string SessionNetWpmHighText => FormatNetWpmExtreme("High", samples => samples.Max());
+
+    public string SessionNetWpmLowText => FormatNetWpmExtreme("Low", samples => samples.Min());
+
     public IReadOnlyList<PracticeReviewRow> ReviewRows => BuildReviewRows(_lastReview);
 
     public IReadOnlyList<string> ReviewNotes => _lastReview?.Notes ?? Array.Empty<string>();
@@ -417,6 +430,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _lastSummary = null;
         _lastReview = null;
         _lastCompletedEvents = Array.Empty<TypingInputEvent>();
+        _sessionNetWpmSamples.Clear();
         CompletionStatus = string.Empty;
         PauseStatus = string.Empty;
         TypingFeedback = string.Empty;
@@ -425,6 +439,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnLessonChanged();
         OnCompletionChanged();
         OnReviewChanged();
+        OnSessionNetWpmChanged();
     }
 
     public void HandleCharacter(char character)
@@ -447,6 +462,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _lastEscapeTimestampTicks = null;
         var result = _session.ProcessCharacter(character, Stopwatch.GetTimestamp());
         CurrentState = result.State;
+        RecordSessionNetWpmSample(result.State);
         TypingFeedback = result.WasRejected
             ? result.FeedbackMessage ?? "Wrong key. Try again."
             : string.Empty;
@@ -472,6 +488,11 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _lastEscapeTimestampTicks = null;
         var result = _session.ProcessBackspace(Stopwatch.GetTimestamp());
         CurrentState = result.State;
+        if (result.WasAccepted)
+        {
+            RecordSessionNetWpmSample(result.State);
+        }
+
         TypingFeedback = result.WasAccepted ? string.Empty : result.FeedbackMessage ?? string.Empty;
     }
 
@@ -585,7 +606,8 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     private void OnCompletionChanged()
     {
-        OnPropertyChanged(nameof(CompletionPanelVisibility));
+        OnPropertyChanged(nameof(ReviewPopupVisibility));
+        OnPropertyChanged(nameof(PracticeContentOpacity));
         OnPropertyChanged(nameof(IsInputEnabled));
         OnPropertyChanged(nameof(CompletionRawWpmText));
         OnPropertyChanged(nameof(CompletionNetWpmText));
@@ -600,6 +622,13 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ReviewVisibility));
         OnPropertyChanged(nameof(CanPracticeMistakes));
         OnPropertyChanged(nameof(PracticeMistakesVisibility));
+    }
+
+    private void OnSessionNetWpmChanged()
+    {
+        OnPropertyChanged(nameof(SessionNetWpmPoints));
+        OnPropertyChanged(nameof(SessionNetWpmHighText));
+        OnPropertyChanged(nameof(SessionNetWpmLowText));
     }
 
     private void OnKeyboardHighlightChanged()
@@ -658,6 +687,35 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         var elapsedMinutes = snapshot.ElapsedMs / 60_000.0;
         var netWpm = ((snapshot.CorrectCharacterKeypresses - snapshot.CurrentErrors) / 5.0) / elapsedMinutes;
         return Math.Max(0, netWpm);
+    }
+
+    private void RecordSessionNetWpmSample(TypingStateSnapshot snapshot)
+    {
+        if (snapshot.TypedCharacterKeypresses <= 0)
+        {
+            return;
+        }
+
+        _sessionNetWpmSamples.Add(new SessionNetWpmSample(
+            Math.Max(0, snapshot.ElapsedMs),
+            CalculateLiveNetWpm(snapshot)));
+        OnSessionNetWpmChanged();
+    }
+
+    private string FormatNetWpmExtreme(string label, Func<IReadOnlyList<double>, double> selector)
+    {
+        var samples = _sessionNetWpmSamples
+            .Select(sample => sample.NetWpm)
+            .Where(value => value > 0)
+            .ToArray();
+        return samples.Length == 0
+            ? $"{label}: --"
+            : $"{label}: {selector(samples):0.0} WPM";
+    }
+
+    private static string FormatElapsedLabel(double elapsedMs)
+    {
+        return TimeSpan.FromMilliseconds(elapsedMs).ToString(@"m\:ss", CultureInfo.InvariantCulture);
     }
 
     private static IReadOnlyList<PracticeReviewRow> BuildReviewRows(SessionReview? review)
@@ -772,3 +830,7 @@ public sealed record PracticeReviewRow(
     string MedianLatencyMs,
     string Samples,
     double WeaknessPercent);
+
+public sealed record SessionNetWpmSample(
+    double ElapsedMs,
+    double NetWpm);
