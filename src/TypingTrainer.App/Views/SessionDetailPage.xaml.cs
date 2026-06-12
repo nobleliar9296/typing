@@ -9,7 +9,9 @@ public sealed partial class SessionDetailPage : Page
     public SessionDetailPage()
     {
         InitializeComponent();
-        ViewModel = new SessionDetailViewModel(App.Services.SessionDetailQueryService);
+        ViewModel = new SessionDetailViewModel(
+            App.Services.SessionDetailQueryService,
+            App.Services.AppSettingsRepository);
         DataContext = ViewModel;
     }
 
@@ -34,4 +36,3 @@ public sealed partial class SessionDetailPage : Page
         Frame.Navigate(typeof(PracticePage));
     }
 }
-

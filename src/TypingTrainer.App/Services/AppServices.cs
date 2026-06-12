@@ -15,6 +15,7 @@ public sealed class AppServices
         IJsonExportService jsonExportService,
         IAnalyticsQueryService analyticsQueryService,
         IKeyboardHeatmapQueryService keyboardHeatmapQueryService,
+        ITrainingHistoryQueryService trainingHistoryQueryService,
         ISessionDetailQueryService sessionDetailQueryService,
         ISkillProfileQueryService skillProfileQueryService,
         IContentQueryService contentQueryService,
@@ -28,6 +29,7 @@ public sealed class AppServices
         JsonExportService = jsonExportService;
         AnalyticsQueryService = analyticsQueryService;
         KeyboardHeatmapQueryService = keyboardHeatmapQueryService;
+        TrainingHistoryQueryService = trainingHistoryQueryService;
         SessionDetailQueryService = sessionDetailQueryService;
         SkillProfileQueryService = skillProfileQueryService;
         ContentQueryService = contentQueryService;
@@ -45,6 +47,8 @@ public sealed class AppServices
     public IAnalyticsQueryService AnalyticsQueryService { get; }
 
     public IKeyboardHeatmapQueryService KeyboardHeatmapQueryService { get; }
+
+    public ITrainingHistoryQueryService TrainingHistoryQueryService { get; }
 
     public ISessionDetailQueryService SessionDetailQueryService { get; }
 
@@ -75,6 +79,7 @@ public sealed class AppServices
         var jsonExportService = new JsonExportService(practiceSessionRepository);
         var analyticsQueryService = new AnalyticsQueryService(connectionFactory);
         var keyboardHeatmapQueryService = new KeyboardHeatmapQueryService(connectionFactory);
+        var trainingHistoryQueryService = new TrainingHistoryQueryService(connectionFactory, appSettingsRepository);
         var sessionDetailQueryService = new SessionDetailQueryService(practiceSessionRepository);
         var localDataBackupService = new LocalDataBackupService(databasePath);
         var skillProfileQueryService = new SkillProfileQueryService(connectionFactory);
@@ -104,6 +109,7 @@ public sealed class AppServices
             jsonExportService,
             analyticsQueryService,
             keyboardHeatmapQueryService,
+            trainingHistoryQueryService,
             sessionDetailQueryService,
             skillProfileQueryService,
             contentQueryService,

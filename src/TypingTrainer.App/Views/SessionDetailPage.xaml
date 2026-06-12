@@ -29,6 +29,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Border Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                         <StackPanel>
@@ -54,7 +55,39 @@
                             <TextBlock Text="Mistakes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                     </Border>
+                    <Border Grid.Column="4" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <StackPanel>
+                            <TextBlock Text="{Binding QualityScoreText}" FontSize="24" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding QualityGradeText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
+
+                <StackPanel Spacing="10">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Consistency" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding QualityExplanationText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        <TextBlock Text="Dips can point to fatigue, pauses, or mistake clusters during the session." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Grid ColumnSpacing="18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="12" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Net WPM over session" FontWeight="SemiBold" />
+                                <controls:TrendLineChart Points="{Binding TimelineNetWpmPoints}" ValueSuffix=" WPM" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Padding="12" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Accuracy over session" FontWeight="SemiBold" />
+                                <controls:TrendLineChart Points="{Binding TimelineAccuracyPoints}" ValueSuffix="%" MaximumValue="100" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
 
                 <Grid ColumnSpacing="18">
                     <Grid.ColumnDefinitions>
@@ -62,7 +95,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="10">
-                        <TextBlock Text="Timeline" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="Timeline Samples" FontSize="20" FontWeight="SemiBold" />
                         <ListView ItemsSource="{Binding TimelineRows}" SelectionMode="None" MaxHeight="260">
                             <ListView.ItemTemplate>
                                 <DataTemplate>
@@ -127,4 +160,3 @@
         </ScrollViewer>
     </Grid>
 </Page>
-

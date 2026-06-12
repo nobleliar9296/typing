@@ -15,6 +15,7 @@ public sealed partial class DashboardPage : Page
         ViewModel = new DashboardViewModel(
             App.Services.AnalyticsQueryService,
             App.Services.KeyboardHeatmapQueryService,
+            App.Services.TrainingHistoryQueryService,
             App.Services.AppSettingsRepository);
         DataContext = ViewModel;
     }
@@ -70,6 +71,14 @@ public sealed partial class DashboardPage : Page
         if (e.ClickedItem is RecentSessionDisplayRow row)
         {
             Frame.Navigate(typeof(SessionDetailPage), row.SessionId);
+        }
+    }
+
+    private void PersonalBestListView_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is PersonalBestDisplayRow { SessionId: Guid sessionId })
+        {
+            Frame.Navigate(typeof(SessionDetailPage), sessionId);
         }
     }
 

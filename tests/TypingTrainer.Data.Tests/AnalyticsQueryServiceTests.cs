@@ -306,6 +306,101 @@ public sealed class AnalyticsQueryServiceTests
         Assert.AreEqual(new DateOnly(2026, 5, 13), snapshot.DailyMetrics.Single().Date);
     }
 
+    [TestMethod]
+    public async Task TrainingHistoryQueryService_WithNoSessions_ReturnsSafeSnapshot()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+
+        var snapshot = await database.TrainingHistory.GetTrainingHistoryAsync(AnalyticsRange.AllTime, modeFilter: null);
+
+        Assert.AreEqual(0, snapshot.QualitySummary.SessionCount);
+        Assert.AreEqual(0, snapshot.QualitySummary.AverageScore);
+        Assert.AreEqual(0, snapshot.PersonalBests.Count);
+        Assert.AreEqual(0, snapshot.CalendarDays.Count);
+        Assert.AreEqual(0, snapshot.RecentQuality.Count);
+    }
+
+    [TestMethod]
+    public async Task TrainingHistoryQueryService_PersonalBestsChooseCorrectSessionsAndRespectModeFilter()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-3), mode: "Fixed", targetText: new string('a', 120), netWpm: 90, total: 120, correct: 100));
+        var paragraph = CreateSession(startedAtUtc: NowUtc.AddHours(-1), mode: "Paragraph", targetText: new string('a', 120), netWpm: 55, total: 120, correct: 118);
+        await database.SaveAsync(paragraph);
+
+        var snapshot = await database.TrainingHistory.GetTrainingHistoryAsync(AnalyticsRange.AllTime, "Paragraph");
+
+        var bestNetWpm = snapshot.PersonalBests.Single(row => row.Kind == "best-net-wpm");
+        Assert.AreEqual(paragraph.Id, bestNetWpm.SessionId);
+        Assert.AreEqual(55, bestNetWpm.Value, 0.0001);
+        Assert.IsTrue(snapshot.PersonalBests.Any(row => row.Kind == "best-paragraph"));
+        Assert.IsFalse(snapshot.PersonalBests.Any(row => row.Mode == "Fixed"));
+    }
+
+    [TestMethod]
+    public async Task TrainingHistoryQueryService_PracticeCalendarGroupsByLocalDate()
+    {
+        var nowUtc = new DateTimeOffset(2026, 6, 12, 4, 0, 0, TimeSpan.Zero);
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(nowUtc, FixedCentralTime);
+        await database.SaveAsync(CreateSession(startedAtUtc: new DateTimeOffset(2026, 6, 12, 2, 30, 0, TimeSpan.Zero)));
+
+        var snapshot = await database.TrainingHistory.GetTrainingHistoryAsync(AnalyticsRange.Last7Days, modeFilter: null);
+
+        var activeDay = snapshot.CalendarDays.Single(day => day.SessionCount == 1);
+        Assert.AreEqual(new DateOnly(2026, 6, 11), activeDay.Date);
+    }
+
+    [TestMethod]
+    public async Task TrainingHistoryQueryService_PracticeCalendarRespectsLast7AndLast30Ranges()
+    {
+        var nowUtc = new DateTimeOffset(2026, 6, 12, 4, 0, 0, TimeSpan.Zero);
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(nowUtc, FixedCentralTime);
+        await database.SaveAsync(CreateSession(startedAtUtc: LocalToUtc(2026, 6, 4, 10, 0)));
+        await database.SaveAsync(CreateSession(startedAtUtc: LocalToUtc(2026, 6, 5, 10, 0)));
+        await database.SaveAsync(CreateSession(startedAtUtc: LocalToUtc(2026, 5, 12, 10, 0)));
+
+        var last7 = await database.TrainingHistory.GetTrainingHistoryAsync(AnalyticsRange.Last7Days, modeFilter: null);
+        var last30 = await database.TrainingHistory.GetTrainingHistoryAsync(AnalyticsRange.Last30Days, modeFilter: null);
+
+        Assert.AreEqual(7, last7.CalendarDays.Count);
+        Assert.AreEqual(1, last7.QualitySummary.SessionCount);
+        Assert.AreEqual(30, last30.CalendarDays.Count);
+        Assert.AreEqual(2, last30.QualitySummary.SessionCount);
+    }
+
+    [TestMethod]
+    public async Task TrainingHistoryQueryService_QualitySummaryCalculatesAverageBestAndTrend()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        await database.Settings.SaveSettingsAsync(AppSettings.Defaults with { GoalTargetNetWpm = 60 });
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-5), netWpm: 20, total: 100, correct: 70));
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-4), netWpm: 25, total: 100, correct: 75));
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-3), netWpm: 30, total: 100, correct: 80));
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-2), netWpm: 55, total: 100, correct: 95));
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-1), netWpm: 60, total: 100, correct: 98));
+
+        var snapshot = await database.TrainingHistory.GetTrainingHistoryAsync(AnalyticsRange.AllTime, modeFilter: null);
+
+        Assert.AreEqual(5, snapshot.QualitySummary.SessionCount);
+        Assert.IsTrue(snapshot.QualitySummary.AverageScore > 0);
+        Assert.IsTrue(snapshot.QualitySummary.BestScore >= snapshot.QualitySummary.AverageScore);
+        Assert.IsTrue(snapshot.QualitySummary.RecentTrend > 0);
+    }
+
+    [TestMethod]
+    public async Task TrainingHistoryQueryService_LongAndParagraphRecordsUseThresholds()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-3), mode: "Paragraph", targetText: new string('a', 999), netWpm: 45, total: 999, correct: 950));
+        var longSession = CreateSession(startedAtUtc: NowUtc.AddHours(-2), mode: "Paragraph", targetText: new string('a', 1000), netWpm: 50, total: 1000, correct: 970);
+        await database.SaveAsync(longSession);
+
+        var snapshot = await database.TrainingHistory.GetTrainingHistoryAsync(AnalyticsRange.AllTime, modeFilter: null);
+
+        Assert.AreEqual(longSession.Id, snapshot.PersonalBests.Single(row => row.Kind == "best-long").SessionId);
+        Assert.AreEqual(longSession.Id, snapshot.PersonalBests.Single(row => row.Kind == "best-paragraph").SessionId);
+    }
+
     private static StoredPracticeSession CreateSession(
         DateTimeOffset startedAtUtc,
         string targetText = "ab",
@@ -379,13 +474,17 @@ public sealed class AnalyticsQueryServiceTests
             string directoryPath,
             SqliteConnectionFactory connectionFactory,
             PracticeSessionRepository repository,
-            AnalyticsQueryService analytics)
+            AnalyticsQueryService analytics,
+            DateTimeOffset nowUtc,
+            TimeZoneInfo? localTimeZone)
         {
             DirectoryPath = directoryPath;
             Repository = repository;
             Analytics = analytics;
             Heatmap = new KeyboardHeatmapQueryService(connectionFactory);
             SessionDetail = new SessionDetailQueryService(repository);
+            Settings = new AppSettingsRepository(connectionFactory);
+            TrainingHistory = new TrainingHistoryQueryService(connectionFactory, Settings, new FixedUtcClock(nowUtc), localTimeZone ?? TimeZoneInfo.Utc);
         }
 
         public string DirectoryPath { get; }
@@ -397,6 +496,10 @@ public sealed class AnalyticsQueryServiceTests
         public KeyboardHeatmapQueryService Heatmap { get; }
 
         public SessionDetailQueryService SessionDetail { get; }
+
+        public AppSettingsRepository Settings { get; }
+
+        public TrainingHistoryQueryService TrainingHistory { get; }
 
         public static async Task<AnalyticsTestDatabase> CreateInitializedAsync(
             DateTimeOffset nowUtc,
@@ -415,7 +518,7 @@ public sealed class AnalyticsQueryServiceTests
                 new FixedUtcClock(nowUtc),
                 localTimeZone ?? TimeZoneInfo.Utc);
 
-            return new AnalyticsTestDatabase(directoryPath, connectionFactory, repository, analytics);
+            return new AnalyticsTestDatabase(directoryPath, connectionFactory, repository, analytics, nowUtc, localTimeZone);
         }
 
         public Task SaveAsync(StoredPracticeSession session)

@@ -13,12 +13,14 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
 {
     private readonly IAnalyticsQueryService _analyticsQueryService;
     private readonly IKeyboardHeatmapQueryService _keyboardHeatmapQueryService;
+    private readonly ITrainingHistoryQueryService _trainingHistoryQueryService;
     private readonly IAppSettingsRepository _settingsRepository;
     private readonly TypingCoach _typingCoach = new();
     private readonly AchievementEvaluator _achievementEvaluator = new();
     private AnalyticsRange _selectedRange = AnalyticsRange.Last7Days;
     private DashboardSnapshot? _snapshot;
     private DashboardSnapshot? _weeklySnapshot;
+    private TrainingHistorySnapshot? _trainingHistory;
     private IReadOnlyList<KeyboardHeatmapKeyRow> _heatmapRows = Array.Empty<KeyboardHeatmapKeyRow>();
     private AppSettings _settings = AppSettings.Defaults;
     private bool _isLoading;
@@ -31,10 +33,12 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     public DashboardViewModel(
         IAnalyticsQueryService analyticsQueryService,
         IKeyboardHeatmapQueryService keyboardHeatmapQueryService,
+        ITrainingHistoryQueryService trainingHistoryQueryService,
         IAppSettingsRepository settingsRepository)
     {
         _analyticsQueryService = analyticsQueryService;
         _keyboardHeatmapQueryService = keyboardHeatmapQueryService;
+        _trainingHistoryQueryService = trainingHistoryQueryService;
         _settingsRepository = settingsRepository;
     }
 
@@ -140,6 +144,28 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     public string ErrorsText => ((Snapshot?.Summary.IncorrectKeypresses ?? 0) + (Snapshot?.Summary.UncorrectedErrors ?? 0))
         .ToString(CultureInfo.InvariantCulture);
 
+    public string QualityAverageText => FormatScore(_trainingHistory?.QualitySummary.AverageScore ?? 0);
+
+    public string QualityBestText => FormatScore(_trainingHistory?.QualitySummary.BestScore ?? 0);
+
+    public string QualityGradeText => _trainingHistory?.QualitySummary.CurrentGrade ?? "Needs work";
+
+    public string QualityTrendText
+    {
+        get
+        {
+            var trend = _trainingHistory?.QualitySummary.RecentTrend ?? 0;
+            if (Math.Abs(trend) < 0.05)
+            {
+                return "No recent trend yet";
+            }
+
+            return trend > 0
+                ? $"+{FormatScore(trend)} points vs prior sessions"
+                : $"{FormatScore(trend)} points vs prior sessions";
+        }
+    }
+
     public double GoalTargetNetWpm
     {
         get => _settings.GoalTargetNetWpm;
@@ -232,6 +258,25 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             row.WeaknessScore * 100))
         .ToArray();
 
+    public IReadOnlyList<PersonalBestDisplayRow> PersonalBestRows => _trainingHistory?.PersonalBests
+        .Select(row => new PersonalBestDisplayRow(
+            row.Label,
+            FormatPersonalBestValue(row),
+            FormatPersonalBestDetail(row),
+            row.SessionId))
+        .ToArray() ?? Array.Empty<PersonalBestDisplayRow>();
+
+    public IReadOnlyList<PracticeCalendarDisplayRow> PracticeCalendarRows => _trainingHistory?.CalendarDays
+        .Select(ToCalendarDisplayRow)
+        .ToArray() ?? Array.Empty<PracticeCalendarDisplayRow>();
+
+    public IReadOnlyList<ChartPointViewModel> QualityTrendPoints => _trainingHistory?.RecentQuality
+        .OrderBy(row => row.StartedAtUtc)
+        .Select(row => new ChartPointViewModel(
+            row.StartedAtUtc.ToLocalTime().ToString("MMM d", CultureInfo.InvariantCulture),
+            row.Score))
+        .ToArray() ?? Array.Empty<ChartPointViewModel>();
+
     public IReadOnlyList<DailyMetricDisplayRow> DailyMetricRows => Snapshot?.DailyMetrics
         .Select(point => new DailyMetricDisplayRow(
             point.Date.ToString("MMM d", CultureInfo.InvariantCulture),
@@ -303,6 +348,9 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             _heatmapRows = await _keyboardHeatmapQueryService
                 .GetHeatmapAsync(SelectedRange, GetModeFilterValue(), cancellationToken)
                 .ConfigureAwait(true);
+            _trainingHistory = await _trainingHistoryQueryService
+                .GetTrainingHistoryAsync(SelectedRange, GetModeFilterValue(), cancellationToken)
+                .ConfigureAwait(true);
             GoalStatus = string.Empty;
         }
         catch
@@ -319,7 +367,11 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     public async Task SaveGoalsAsync(CancellationToken cancellationToken = default)
     {
         await _settingsRepository.SaveSettingsAsync(_settings, cancellationToken).ConfigureAwait(true);
+        _trainingHistory = await _trainingHistoryQueryService
+            .GetTrainingHistoryAsync(SelectedRange, GetModeFilterValue(), cancellationToken)
+            .ConfigureAwait(true);
         GoalStatus = "Typing goals saved locally.";
+        OnTrainingHistoryChanged();
         OnGoalSettingsChanged();
     }
 
@@ -355,6 +407,11 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         return value.ToString("0.0", CultureInfo.InvariantCulture);
     }
 
+    private static string FormatScore(double value)
+    {
+        return value.ToString("0", CultureInfo.InvariantCulture);
+    }
+
     private static string FormatLatency(double? value)
     {
         return value is null ? "-" : value.Value.ToString("0", CultureInfo.InvariantCulture);
@@ -376,6 +433,57 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     }
 
     private TimeSpan WeeklyPracticeTime => _weeklySnapshot?.Summary.TotalPracticeTime ?? TimeSpan.Zero;
+
+    private PracticeCalendarDisplayRow ToCalendarDisplayRow(PracticeCalendarDay day)
+    {
+        var dailyTargetMinutes = Math.Max(5, _settings.GoalWeeklyPracticeMinutes / 7.0);
+        var practicePercent = Math.Clamp(day.PracticeTime.TotalMinutes / dailyTargetMinutes * 100, 0, 100);
+        var qualityPercent = Math.Clamp(day.AverageQualityScore, 0, 100);
+        var practiceText = day.PracticeTime.TotalMinutes >= 1
+            ? FormatDuration(day.PracticeTime)
+            : "0s";
+        var toolTip = day.SessionCount == 0
+            ? $"{day.Date:MMM d}: no saved practice"
+            : $"{day.Date:MMM d}: {practiceText}, {day.SessionCount} session(s), {FormatScore(day.AverageQualityScore)} quality";
+
+        return new PracticeCalendarDisplayRow(
+            day.Date.ToString("MMM d", CultureInfo.InvariantCulture),
+            day.Date.Day.ToString(CultureInfo.InvariantCulture),
+            day.SessionCount.ToString(CultureInfo.InvariantCulture),
+            practiceText,
+            day.SessionCount == 0 ? "-" : FormatScore(day.AverageQualityScore),
+            toolTip,
+            practicePercent,
+            qualityPercent);
+    }
+
+    private static string FormatPersonalBestValue(PersonalBestRow row)
+    {
+        return row.Unit switch
+        {
+            "WPM" => $"{FormatWpm(row.Value)} WPM",
+            "%" => $"{row.Value.ToString("0.0", CultureInfo.InvariantCulture)}%",
+            "min" => FormatDuration(TimeSpan.FromMinutes(row.Value)),
+            "day" or "days" => $"{row.Value.ToString("0", CultureInfo.InvariantCulture)} {row.Unit}",
+            _ => $"{row.Value.ToString("0.0", CultureInfo.InvariantCulture)} {row.Unit}"
+        };
+    }
+
+    private static string FormatPersonalBestDetail(PersonalBestRow row)
+    {
+        var parts = new List<string>();
+        if (row.Date is not null)
+        {
+            parts.Add(row.Date.Value.ToString("MMM d", CultureInfo.InvariantCulture));
+        }
+
+        if (!string.IsNullOrWhiteSpace(row.Mode))
+        {
+            parts.Add(row.Mode);
+        }
+
+        return parts.Count == 0 ? "Local history" : string.Join(" - ", parts);
+    }
 
     private IReadOnlyList<string> BuildGoalActionSteps()
     {
@@ -618,7 +726,19 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(WeakestBigramRows));
         OnPropertyChanged(nameof(SlowestBigramRows));
         OnPropertyChanged(nameof(HeatmapRows));
+        OnTrainingHistoryChanged();
         OnGoalSettingsChanged();
+    }
+
+    private void OnTrainingHistoryChanged()
+    {
+        OnPropertyChanged(nameof(QualityAverageText));
+        OnPropertyChanged(nameof(QualityBestText));
+        OnPropertyChanged(nameof(QualityGradeText));
+        OnPropertyChanged(nameof(QualityTrendText));
+        OnPropertyChanged(nameof(PersonalBestRows));
+        OnPropertyChanged(nameof(PracticeCalendarRows));
+        OnPropertyChanged(nameof(QualityTrendPoints));
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -663,6 +783,22 @@ public sealed record AchievementDisplayRow(
     string Description,
     string Status,
     double Progress);
+
+public sealed record PersonalBestDisplayRow(
+    string Label,
+    string Value,
+    string Detail,
+    Guid? SessionId);
+
+public sealed record PracticeCalendarDisplayRow(
+    string Date,
+    string Day,
+    string Sessions,
+    string PracticeTime,
+    string Quality,
+    string ToolTip,
+    double PracticePercent,
+    double QualityPercent);
 
 public sealed record KeyboardHeatmapDisplayRow(
     string Key,

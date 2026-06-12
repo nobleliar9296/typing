@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.UI.Xaml;
+using TypingTrainer.Core.Training;
 using TypingTrainer.Data.Models;
+using TypingTrainer.Data.Repositories;
 using TypingTrainer.Data.Services;
 
 namespace TypingTrainer.App.ViewModels;
@@ -10,13 +12,19 @@ namespace TypingTrainer.App.ViewModels;
 public sealed class SessionDetailViewModel : INotifyPropertyChanged
 {
     private readonly ISessionDetailQueryService _sessionDetailQueryService;
+    private readonly IAppSettingsRepository _settingsRepository;
+    private readonly SessionQualityCalculator _qualityCalculator = new();
     private SessionDetailSnapshot? _snapshot;
+    private AppSettings _settings = AppSettings.Defaults;
     private bool _isLoading;
     private string? _errorMessage;
 
-    public SessionDetailViewModel(ISessionDetailQueryService sessionDetailQueryService)
+    public SessionDetailViewModel(
+        ISessionDetailQueryService sessionDetailQueryService,
+        IAppSettingsRepository settingsRepository)
     {
         _sessionDetailQueryService = sessionDetailQueryService;
+        _settingsRepository = settingsRepository;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -69,7 +77,22 @@ public sealed class SessionDetailViewModel : INotifyPropertyChanged
 
     public string MistakesText => ((Snapshot?.Session.IncorrectKeypresses ?? 0) + (Snapshot?.Session.UncorrectedErrors ?? 0)).ToString(CultureInfo.InvariantCulture);
 
+    public string QualityScoreText => QualityResult.Score.ToString("0", CultureInfo.InvariantCulture);
+
+    public string QualityGradeText => QualityResult.Grade;
+
+    public string QualityExplanationText =>
+        $"Quality blends accuracy, net WPM against your {_settings.GoalTargetNetWpm} WPM goal, consistency, and control.";
+
     public IReadOnlyList<SessionTimelinePoint> TimelineRows => Snapshot?.Timeline ?? Array.Empty<SessionTimelinePoint>();
+
+    public IReadOnlyList<ChartPointViewModel> TimelineNetWpmPoints => TimelineRows
+        .Select(point => new ChartPointViewModel(point.Label, point.NetWpm))
+        .ToArray();
+
+    public IReadOnlyList<ChartPointViewModel> TimelineAccuracyPoints => TimelineRows
+        .Select(point => new ChartPointViewModel(point.Label, point.AccuracyPercent))
+        .ToArray();
 
     public IReadOnlyList<SessionDetailMistakeRow> MistakeRows => Snapshot?.Mistakes ?? Array.Empty<SessionDetailMistakeRow>();
 
@@ -87,6 +110,7 @@ public sealed class SessionDetailViewModel : INotifyPropertyChanged
         {
             IsLoading = true;
             ErrorMessage = null;
+            _settings = await _settingsRepository.GetSettingsAsync(cancellationToken);
             Snapshot = await _sessionDetailQueryService.GetSessionDetailAsync(sessionId, cancellationToken);
             if (Snapshot is null)
             {
@@ -111,10 +135,63 @@ public sealed class SessionDetailViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(AccuracyText));
         OnPropertyChanged(nameof(DurationText));
         OnPropertyChanged(nameof(MistakesText));
+        OnPropertyChanged(nameof(QualityScoreText));
+        OnPropertyChanged(nameof(QualityGradeText));
+        OnPropertyChanged(nameof(QualityExplanationText));
         OnPropertyChanged(nameof(TimelineRows));
+        OnPropertyChanged(nameof(TimelineNetWpmPoints));
+        OnPropertyChanged(nameof(TimelineAccuracyPoints));
         OnPropertyChanged(nameof(MistakeRows));
         OnPropertyChanged(nameof(SlowestKeyRows));
         OnPropertyChanged(nameof(SlowestBigramRows));
+    }
+
+    private SessionQualityResult QualityResult
+    {
+        get
+        {
+            if (Snapshot is null)
+            {
+                return _qualityCalculator.Calculate(new SessionQualityInputs(0, 0, _settings.GoalTargetNetWpm, null, 0, 0));
+            }
+
+            var session = Snapshot.Session;
+            var completionRatio = session.TargetLength <= 0
+                ? 1
+                : Math.Min(1, session.TotalKeypresses / (double)session.TargetLength);
+            var controlRatio = session.TargetLength <= 0
+                ? 1
+                : Math.Clamp(1 - (session.UncorrectedErrors / (double)session.TargetLength), 0, 1);
+
+            return _qualityCalculator.Calculate(new SessionQualityInputs(
+                session.Accuracy,
+                session.NetWpm,
+                _settings.GoalTargetNetWpm,
+                session.Consistency ?? CalculateTimelineConsistency(TimelineRows),
+                completionRatio,
+                controlRatio));
+        }
+    }
+
+    private static double? CalculateTimelineConsistency(IReadOnlyList<SessionTimelinePoint> points)
+    {
+        var samples = points
+            .Select(point => point.NetWpm)
+            .Where(value => value > 0)
+            .ToArray();
+        if (samples.Length < 2)
+        {
+            return null;
+        }
+
+        var average = samples.Average();
+        if (average <= 0)
+        {
+            return 1;
+        }
+
+        var variance = samples.Average(value => Math.Pow(value - average, 2));
+        return Math.Clamp(1 - (Math.Sqrt(variance) / average), 0, 1);
     }
 
     private static string FormatWpm(double value) => value.ToString("0.0", CultureInfo.InvariantCulture);
@@ -138,4 +215,3 @@ public sealed record SessionDetailAnalyticsRow(
     string Accuracy,
     string MedianLatencyMs,
     string Samples);
-
