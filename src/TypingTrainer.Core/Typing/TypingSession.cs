@@ -66,7 +66,8 @@ public sealed class TypingSession
                 index,
                 TargetText[index],
                 position.ActualChar,
-                state);
+                state,
+                position.HadRejectedInput);
         }
 
         return new TypingStateSnapshot(
@@ -103,13 +104,29 @@ public sealed class TypingSession
         var position = CursorIndex;
         var expectedChar = TargetText[position];
         var isCorrect = typedChar == expectedChar;
-        var wasCorrection = _positionWasCleared[position];
+        var currentPosition = _positions[position];
+        var hadRejectedInput = currentPosition.HadRejectedInput;
+        var wasCorrection = _positionWasCleared[position] || hadRejectedInput;
         var shouldAdvance = isCorrect || _options.ErrorAdvanceMode == ErrorAdvanceMode.AdvanceOnError;
 
         if (shouldAdvance)
         {
-            _positions[position] = new TypedPosition(typedChar, isCorrect);
+            _positions[position] = new TypedPosition(
+                typedChar,
+                isCorrect,
+                CountsAsError: !isCorrect || hadRejectedInput,
+                HadRejectedInput: hadRejectedInput,
+                IsPendingRejectedInput: false);
             CursorIndex++;
+        }
+        else
+        {
+            _positions[position] = new TypedPosition(
+                typedChar,
+                IsCorrect: false,
+                CountsAsError: true,
+                HadRejectedInput: true,
+                IsPendingRejectedInput: true);
         }
 
         _typedCharacterKeypresses++;
@@ -153,6 +170,11 @@ public sealed class TypingSession
             return Ignored(timestampTicks, "Backspace is disabled for this session.");
         }
 
+        if (!IsComplete && _positions[CursorIndex].IsPendingRejectedInput)
+        {
+            return ClearPendingRejectedInput(timestampTicks);
+        }
+
         if (CursorIndex <= 0)
         {
             return Ignored(timestampTicks, "There is no typed character to remove.");
@@ -162,7 +184,9 @@ public sealed class TypingSession
         var removed = _positions[removedPosition];
 
         CursorIndex = removedPosition;
-        _positions[removedPosition] = default;
+        _positions[removedPosition] = removed.HadRejectedInput
+            ? TypedPosition.ClearedRejectedInput
+            : default;
         _positionWasCleared[removedPosition] = true;
         _backspaceCount++;
 
@@ -208,10 +232,39 @@ public sealed class TypingSession
     {
         if (typedPosition.ActualChar is not null)
         {
-            return typedPosition.IsCorrect ? CharacterState.Correct : CharacterState.Incorrect;
+            return typedPosition.CountsAsError ? CharacterState.Incorrect : CharacterState.Correct;
         }
 
         return position == CursorIndex && !IsComplete ? CharacterState.Current : CharacterState.Pending;
+    }
+
+    private KeyProcessResult ClearPendingRejectedInput(long timestampTicks)
+    {
+        var removedPosition = CursorIndex;
+        var removed = _positions[removedPosition];
+
+        _positions[removedPosition] = TypedPosition.ClearedRejectedInput;
+        _positionWasCleared[removedPosition] = true;
+        _backspaceCount++;
+
+        var inputEvent = CreateEvent(
+            removedPosition,
+            TargetText[removedPosition],
+            removed.ActualChar,
+            InputEventKind.Backspace,
+            IsCorrect: true,
+            WasCorrection: true,
+            timestampTicks);
+
+        _events.Add(inputEvent);
+        _lastEventTimestampTicks = timestampTicks;
+
+        return new KeyProcessResult(
+            GetSnapshot(timestampTicks),
+            inputEvent,
+            WasAccepted: true,
+            DidAdvance: false,
+            WasCorrect: true);
     }
 
     private KeyProcessResult Ignored(long timestampTicks, string message)
@@ -258,5 +311,18 @@ public sealed class TypingSession
             : 0;
     }
 
-    private readonly record struct TypedPosition(char? ActualChar, bool IsCorrect);
+    private readonly record struct TypedPosition(
+        char? ActualChar,
+        bool IsCorrect,
+        bool CountsAsError,
+        bool HadRejectedInput,
+        bool IsPendingRejectedInput)
+    {
+        public static TypedPosition ClearedRejectedInput { get; } = new(
+            ActualChar: null,
+            IsCorrect: false,
+            CountsAsError: false,
+            HadRejectedInput: true,
+            IsPendingRejectedInput: false);
+    }
 }

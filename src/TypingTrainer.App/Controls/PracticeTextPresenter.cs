@@ -163,7 +163,9 @@ public sealed class PracticeTextPresenter : UserControl
 
         foreach (var character in State.Characters)
         {
-            if (character.State == CharacterState.Current)
+            var visualState = GetVisualState(character);
+
+            if (visualState == CharacterState.Current)
             {
                 FlushRun(textBuilder, activeState);
                 activeState = null;
@@ -171,12 +173,12 @@ public sealed class PracticeTextPresenter : UserControl
                 continue;
             }
 
-            if (activeState is not null && activeState != character.State)
+            if (activeState is not null && activeState != visualState)
             {
                 FlushRun(textBuilder, activeState);
             }
 
-            activeState = character.State;
+            activeState = visualState;
             textBuilder.Append(GetDisplayChar(character));
         }
 
@@ -224,6 +226,16 @@ public sealed class PracticeTextPresenter : UserControl
     private static char GetDisplayChar(CharacterSnapshot character)
     {
         return character.ActualChar ?? character.ExpectedChar;
+    }
+
+    private static CharacterState GetVisualState(CharacterSnapshot character)
+    {
+        if (character.State == CharacterState.Correct && character.HadRejectedInput)
+        {
+            return CharacterState.Incorrect;
+        }
+
+        return character.State;
     }
 
     private Brush GetBrush(CharacterState state)

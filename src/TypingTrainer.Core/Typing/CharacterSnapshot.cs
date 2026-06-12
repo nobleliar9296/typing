@@ -4,4 +4,5 @@ public sealed record CharacterSnapshot(
     int Position,
     char ExpectedChar,
     char? ActualChar,
-    CharacterState State);
+    CharacterState State,
+    bool HadRejectedInput = false);
