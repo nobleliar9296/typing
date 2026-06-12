@@ -11,6 +11,8 @@ public interface ILessonService
 
     Task<AppSettings> GetSettingsAsync(CancellationToken cancellationToken = default);
 
+    Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default);
+
     Task<LessonGenerationResult> GenerateNextLessonAsync(
         LessonMode mode,
         int? targetCharactersOverride = null,

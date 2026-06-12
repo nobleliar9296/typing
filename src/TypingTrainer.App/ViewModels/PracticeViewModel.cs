@@ -42,6 +42,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private string _completionStatus = string.Empty;
     private string _pauseStatus = string.Empty;
     private string _typingFeedback = string.Empty;
+    private string _clipboardStatus = string.Empty;
     private string _reviewRetryStatus = string.Empty;
     private SessionSummary? _lastSummary;
     private SessionReview? _lastReview;
@@ -207,6 +208,22 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         ? Visibility.Collapsed
         : Visibility.Visible;
 
+    public bool ZenModeEnabled
+    {
+        get => _settings.ZenModeEnabled;
+        set
+        {
+            if (_settings.ZenModeEnabled == value)
+            {
+                return;
+            }
+
+            _settings = _settings with { ZenModeEnabled = value };
+            OnVisualKeyboardSettingsChanged();
+            _ = SavePracticeSettingsAsync(_settings);
+        }
+    }
+
     public bool KeySoundEnabled => _settings.KeySoundEnabled;
 
     public bool MistakeSoundEnabled => _settings.MistakeSoundEnabled;
@@ -269,6 +286,24 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     }
 
     public Visibility TypingFeedbackVisibility => string.IsNullOrWhiteSpace(TypingFeedback)
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+
+    public string ClipboardStatus
+    {
+        get => _clipboardStatus;
+        private set
+        {
+            if (_clipboardStatus != value)
+            {
+                _clipboardStatus = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ClipboardStatusVisibility));
+            }
+        }
+    }
+
+    public Visibility ClipboardStatusVisibility => string.IsNullOrWhiteSpace(ClipboardStatus)
         ? Visibility.Collapsed
         : Visibility.Visible;
 
@@ -490,6 +525,12 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public async Task StartClipboardLessonAsync(string clipboardText, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(clipboardText))
+        {
+            ClipboardStatus = "Copy some text first, then choose Practice copied text.";
+            return;
+        }
+
         try
         {
             IsGeneratingLesson = true;
@@ -504,11 +545,17 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
                 cancellationToken);
             SelectedLessonMode = LessonMode.Clipboard;
             StartSession(lesson, LessonMode.Clipboard);
+            ClipboardStatus = "Copied text loaded as a one-off lesson.";
         }
         finally
         {
             IsGeneratingLesson = false;
         }
+    }
+
+    public void SetClipboardUnavailable()
+    {
+        ClipboardStatus = "Clipboard text unavailable. Copy plain text and try again.";
     }
 
     public bool StartRetryFromNetWpmPoint(int pointIndex)
@@ -591,6 +638,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         CompletionStatus = string.Empty;
         PauseStatus = string.Empty;
         TypingFeedback = string.Empty;
+        ClipboardStatus = string.Empty;
         ReviewRetryStatus = string.Empty;
         OnVisualKeyboardSettingsChanged();
         CurrentState = _session.GetSnapshot(Stopwatch.GetTimestamp());
@@ -771,6 +819,8 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CompletionStatus));
         OnPropertyChanged(nameof(TypingFeedback));
         OnPropertyChanged(nameof(TypingFeedbackVisibility));
+        OnPropertyChanged(nameof(ClipboardStatus));
+        OnPropertyChanged(nameof(ClipboardStatusVisibility));
         OnKeyboardHighlightChanged();
     }
 
@@ -830,6 +880,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ShowVisualKeyboard));
         OnPropertyChanged(nameof(ShowFingerColors));
         OnPropertyChanged(nameof(ShowFingerLabels));
+        OnPropertyChanged(nameof(ZenModeEnabled));
         OnPropertyChanged(nameof(PracticeStatsVisibility));
         OnPropertyChanged(nameof(KeySoundEnabled));
         OnPropertyChanged(nameof(MistakeSoundEnabled));
@@ -1174,6 +1225,18 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnCompletionChanged();
         OnReviewChanged();
         OnPropertyChanged(nameof(IsInputEnabled));
+    }
+
+    private async Task SavePracticeSettingsAsync(AppSettings settings)
+    {
+        try
+        {
+            await _lessonService.SaveSettingsAsync(settings);
+        }
+        catch
+        {
+            // Practice display toggles should never interrupt typing if persistence is unavailable.
+        }
     }
 
     private bool IsCurrentCompletion(int completedGeneration)

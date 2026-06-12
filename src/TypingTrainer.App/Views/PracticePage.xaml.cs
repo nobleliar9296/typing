@@ -159,6 +159,7 @@ public sealed partial class PracticePage : Page
             var dataPackageView = Clipboard.GetContent();
             if (!dataPackageView.Contains(StandardDataFormats.Text))
             {
+                ViewModel.SetClipboardUnavailable();
                 return;
             }
 
@@ -172,7 +173,7 @@ public sealed partial class PracticePage : Page
         }
         catch
         {
-            // Clipboard access can be denied by Windows; leave the current lesson untouched.
+            ViewModel.SetClipboardUnavailable();
         }
     }
 

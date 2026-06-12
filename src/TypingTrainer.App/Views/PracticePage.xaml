@@ -24,6 +24,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Grid
@@ -60,7 +61,7 @@
                             <ComboBoxItem Content="Weak Keys" />
                             <ComboBoxItem Content="Weak Bigrams" />
                             <ComboBoxItem Content="Review" />
-                            <ComboBoxItem Content="Clipboard" />
+                            <ComboBoxItem Content="Copied Text" />
                             <ComboBoxItem Content="Fixed" />
                         </ComboBox>
                     </StackPanel>
@@ -76,7 +77,12 @@
                             <ComboBoxItem Content="Long" />
                         </ComboBox>
                     </StackPanel>
-                    <Button Content="Clipboard" Click="ClipboardLessonButton_Click" />
+                    <ToggleSwitch
+                        MinWidth="88"
+                        OffContent="Zen"
+                        OnContent="Zen"
+                        IsOn="{Binding ZenModeEnabled, Mode=TwoWay}" />
+                    <Button Content="Practice copied text" Click="ClipboardLessonButton_Click" />
                 </StackPanel>
             </Grid>
 
@@ -126,6 +132,12 @@
                     MaxLines="1"
                     Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
             </Grid>
+            <TextBlock
+                Grid.Row="2"
+                Text="{Binding ClipboardStatus}"
+                Visibility="{Binding ClipboardStatusVisibility}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                TextWrapping="Wrap" />
 
         </Grid>
 

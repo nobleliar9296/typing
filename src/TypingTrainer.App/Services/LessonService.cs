@@ -51,6 +51,11 @@ public sealed class LessonService : ILessonService
         return _appSettingsRepository.GetSettingsAsync(cancellationToken);
     }
 
+    public Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        return _appSettingsRepository.SaveSettingsAsync(settings, cancellationToken);
+    }
+
     public async Task<LessonGenerationResult> GenerateNextLessonAsync(
         LessonMode mode,
         int? targetCharactersOverride = null,
