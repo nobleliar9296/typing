@@ -1,6 +1,6 @@
-using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Text.Json;
 using TypingTrainer.Data.Database;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Data.Repositories;

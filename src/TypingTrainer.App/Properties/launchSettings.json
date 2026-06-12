@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TypingTrainer.App": {
+      "commandName": "Project",
+      "workingDirectory": "C:\\Users\\gunde\\project\\keyboard"
+    }
+  }
+}

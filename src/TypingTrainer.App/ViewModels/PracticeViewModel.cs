@@ -1,8 +1,8 @@
+using Microsoft.UI.Xaml;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using Microsoft.UI.Xaml;
 using TypingTrainer.App.Services;
 using TypingTrainer.Core.Keyboard;
 using TypingTrainer.Core.Lessons;

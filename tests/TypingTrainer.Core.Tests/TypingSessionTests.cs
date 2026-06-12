@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Diagnostics;
 using TypingTrainer.Core.Typing;
 
 namespace TypingTrainer.Core.Tests;

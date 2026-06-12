@@ -1,8 +1,8 @@
-using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
+using System.Text;
 using TypingTrainer.Core.Typing;
 using Windows.UI;
 

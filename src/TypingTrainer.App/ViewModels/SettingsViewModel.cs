@@ -1,7 +1,7 @@
+using Microsoft.UI.Xaml;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using Microsoft.UI.Xaml;
 using TypingTrainer.Data.Content;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Data.Repositories;

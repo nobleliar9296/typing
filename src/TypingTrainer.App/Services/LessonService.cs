@@ -1,5 +1,5 @@
-using TypingTrainer.Core.Keyboard;
 using TypingTrainer.Core.Coaching;
+using TypingTrainer.Core.Keyboard;
 using TypingTrainer.Core.Lessons;
 using TypingTrainer.Core.Review;
 using TypingTrainer.Core.Skill;

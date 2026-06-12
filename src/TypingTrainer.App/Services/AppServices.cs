@@ -1,10 +1,10 @@
-using TypingTrainer.Data.Database;
-using TypingTrainer.Data.Content;
-using TypingTrainer.Data.Repositories;
-using TypingTrainer.Data.Services;
 using TypingTrainer.Core.Content;
 using TypingTrainer.Core.Lessons;
 using TypingTrainer.Core.Skill;
+using TypingTrainer.Data.Content;
+using TypingTrainer.Data.Database;
+using TypingTrainer.Data.Repositories;
+using TypingTrainer.Data.Services;
 
 namespace TypingTrainer.App.Services;
 

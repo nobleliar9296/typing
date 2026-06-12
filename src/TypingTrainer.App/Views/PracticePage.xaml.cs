@@ -1,10 +1,10 @@
-using System.Diagnostics;
-using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using System.ComponentModel;
+using System.Diagnostics;
 using TypingTrainer.App.ViewModels;
 using TypingTrainer.Core.Lessons;
 using Windows.System;
