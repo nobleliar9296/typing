@@ -1,4 +1,5 @@
 using TypingTrainer.Core.Keyboard;
+using TypingTrainer.Core.Learning;
 using TypingTrainer.Core.Skill;
 
 namespace TypingTrainer.Core.Lessons;
@@ -45,13 +46,15 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
         var text = candidateWords.Length < 10
             ? GenerateFallbackDrill(options, unlockedCharacters, focusCharacters, focusBigrams, sampler)
             : GenerateFromWords(skillProfile, options, candidateWords, focusCharacters, focusBigrams, unlockedCharacters, sampler);
+        var learningTargets = GetUsedDueLearningTargets(skillProfile, focusCharacters, focusBigrams);
 
         return new LessonGenerationResult(
             text,
             unlockedCharacters,
             focusCharacters,
             focusBigrams,
-            BuildReason(skillProfile, options.Mode, focusCharacters, focusBigrams));
+            BuildReason(skillProfile, options.Mode, focusCharacters, focusBigrams),
+            LearningTargets: learningTargets);
     }
 
     private string GenerateFromWords(
@@ -128,8 +131,17 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
         }
 
         var limit = options.Mode == LessonMode.WeakKeys ? 5 : 4;
+        var dueCharacters = profile.DueLearningTargets
+            .Where(target => target.Type == LearningItemType.Character)
+            .Select(target => target.Target)
+            .Where(target => target.Length == 1)
+            .Select(target => target[0])
+            .Where(unlockedCharacters.Contains)
+            .Take(limit)
+            .ToArray();
         var candidates = profile.Characters.Values
             .Where(skill => unlockedCharacters.Contains(skill.Character))
+            .Where(skill => !dueCharacters.Contains(skill.Character))
             .Where(skill => skill.ExposureCount >= 5);
         var focus = NormalizeFocus(options.TrainingFocus);
 
@@ -160,7 +172,10 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
 
         if (weakCharacters.Length > 0)
         {
-            return weakCharacters;
+            return dueCharacters
+                .Concat(weakCharacters)
+                .Distinct()
+                .Take(limit);
         }
 
         var newest = _unlockPlanner
@@ -174,7 +189,10 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
             _ => newest
         };
 
-        return newest.Take(limit);
+        return dueCharacters
+            .Concat(newest)
+            .Distinct()
+            .Take(limit);
     }
 
     private static IEnumerable<string> SelectFocusBigrams(
@@ -189,10 +207,18 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
 
         var limit = options.Mode == LessonMode.WeakBigrams ? 8 : 3;
         var focus = NormalizeFocus(options.TrainingFocus);
+        var dueBigrams = profile.DueLearningTargets
+            .Where(target => target.Type == LearningItemType.Bigram)
+            .Select(target => target.Target)
+            .Where(target => target.Length == 2)
+            .Where(target => target.All(unlockedCharacters.Contains))
+            .Take(limit)
+            .ToArray();
         var candidates = profile.Bigrams.Values
             .Where(skill => skill.Bigram.Length == 2)
             .Where(skill => skill.ExposureCount >= 3)
-            .Where(skill => skill.Bigram.All(unlockedCharacters.Contains));
+            .Where(skill => skill.Bigram.All(unlockedCharacters.Contains))
+            .Where(skill => !dueBigrams.Contains(skill.Bigram, StringComparer.Ordinal));
 
         candidates = focus switch
         {
@@ -202,11 +228,14 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
             _ => candidates
         };
 
-        return candidates
+        return dueBigrams
+            .Concat(candidates
             .OrderByDescending(skill => skill.WeaknessScore)
             .ThenByDescending(skill => skill.MedianLatencyMs ?? 0)
             .Take(limit)
-            .Select(skill => skill.Bigram);
+            .Select(skill => skill.Bigram))
+            .Distinct(StringComparer.Ordinal)
+            .Take(limit);
     }
 
     private static double ScoreWord(
@@ -353,6 +382,21 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
             return "New user home-row practice";
         }
 
+        var dueTargets = profile.DueLearningTargets
+            .Where(target =>
+                target.Type == LearningItemType.Character
+                    ? target.Target.Length == 1 && focusCharacters.Contains(target.Target[0])
+                    : focusBigrams.Contains(target.Target, StringComparer.Ordinal))
+            .Select(target => FormatLearningTarget(target))
+            .Distinct(StringComparer.Ordinal)
+            .Take(6)
+            .ToArray();
+
+        if (dueTargets.Length > 0)
+        {
+            return $"Spaced review: {string.Join(", ", dueTargets)}";
+        }
+
         return mode switch
         {
             LessonMode.WeakKeys => $"Weak key practice focused on {FormatFocusCharacters(focusCharacters)}",
@@ -376,5 +420,26 @@ public sealed class AdaptiveLessonGenerator : ILessonGenerator
         return focusBigrams.Count == 0
             ? "current unlocked transitions"
             : string.Join(", ", focusBigrams);
+    }
+
+    private static string FormatLearningTarget(LearningTarget target)
+    {
+        return target.Type == LearningItemType.Character && target.Target == " "
+            ? "Space"
+            : target.Target;
+    }
+
+    private static IReadOnlyList<LearningTarget> GetUsedDueLearningTargets(
+        UserSkillProfile profile,
+        IReadOnlyList<char> focusCharacters,
+        IReadOnlyList<string> focusBigrams)
+    {
+        return profile.DueLearningTargets
+            .Where(target =>
+                target.Type == LearningItemType.Character
+                    ? target.Target.Length == 1 && focusCharacters.Contains(target.Target[0])
+                    : focusBigrams.Contains(target.Target, StringComparer.Ordinal))
+            .Take(8)
+            .ToArray();
     }
 }

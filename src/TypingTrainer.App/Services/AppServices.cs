@@ -23,6 +23,7 @@ public sealed class AppServices
         ILocalDataBackupService localDataBackupService,
         IAppSettingsRepository appSettingsRepository,
         ILessonService lessonService,
+        ILearningProgressRepository learningProgressRepository,
         ISessionPersistenceQueue sessionPersistenceQueue)
     {
         PracticeSessionRepository = practiceSessionRepository;
@@ -37,6 +38,7 @@ public sealed class AppServices
         LocalDataBackupService = localDataBackupService;
         AppSettingsRepository = appSettingsRepository;
         LessonService = lessonService;
+        LearningProgressRepository = learningProgressRepository;
         SessionPersistenceQueue = sessionPersistenceQueue;
     }
 
@@ -64,6 +66,8 @@ public sealed class AppServices
 
     public ILessonService LessonService { get; }
 
+    public ILearningProgressRepository LearningProgressRepository { get; }
+
     public ISessionPersistenceQueue SessionPersistenceQueue { get; }
 
     public static async Task<AppServices> CreateAsync(CancellationToken cancellationToken = default)
@@ -75,6 +79,7 @@ public sealed class AppServices
         await databaseInitializer.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         var practiceSessionRepository = new PracticeSessionRepository(connectionFactory);
+        var learningProgressRepository = new LearningProgressRepository(connectionFactory);
         var appSettingsRepository = new AppSettingsRepository(connectionFactory);
         var jsonExportService = new JsonExportService(practiceSessionRepository);
         var analyticsQueryService = new AnalyticsQueryService(connectionFactory);
@@ -102,7 +107,9 @@ public sealed class AppServices
             contentQueryService,
             adaptiveLessonGenerator,
             paragraphLessonGenerator);
-        var sessionPersistenceQueue = new SessionPersistenceQueue(practiceSessionRepository);
+        var sessionPersistenceQueue = new SessionPersistenceQueue(
+            practiceSessionRepository,
+            learningProgressRepository);
 
         return new AppServices(
             practiceSessionRepository,
@@ -117,6 +124,7 @@ public sealed class AppServices
             localDataBackupService,
             appSettingsRepository,
             lessonService,
+            learningProgressRepository,
             sessionPersistenceQueue);
     }
 }

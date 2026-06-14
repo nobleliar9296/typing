@@ -118,6 +118,13 @@ public sealed class PracticeSessionRepository : IPracticeSessionRepository
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
+        await using (var deleteLearningCommand = connection.CreateCommand())
+        {
+            deleteLearningCommand.Transaction = (SqliteTransaction)transaction;
+            deleteLearningCommand.CommandText = "DELETE FROM learning_items;";
+            await deleteLearningCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         await using (var deleteEventsCommand = connection.CreateCommand())
         {
             deleteEventsCommand.Transaction = (SqliteTransaction)transaction;

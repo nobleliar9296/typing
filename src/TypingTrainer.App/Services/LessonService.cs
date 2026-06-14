@@ -51,6 +51,11 @@ public sealed class LessonService : ILessonService
         return _appSettingsRepository.GetSettingsAsync(cancellationToken);
     }
 
+    public Task<UserSkillProfile> GetSkillProfileAsync(CancellationToken cancellationToken = default)
+    {
+        return _skillProfileQueryService.GetUserSkillProfileAsync(cancellationToken);
+    }
+
     public Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         return _appSettingsRepository.SaveSettingsAsync(settings, cancellationToken);
@@ -129,7 +134,8 @@ public sealed class LessonService : ILessonService
             clipboardText,
             settings.NormalizeImportedTextToAscii,
             settings.NormalizeImportedWhitespace,
-            settings.LowercaseImportedText);
+            settings.LowercaseImportedText,
+            !settings.AllowPunctuation);
         var text = TrimToTargetLength(normalized, targetCharacters);
 
         if (string.IsNullOrWhiteSpace(text))
@@ -214,6 +220,29 @@ public sealed class LessonService : ILessonService
         return Task.FromResult(lesson);
     }
 
+    public async Task<LessonGenerationResult> GenerateMistakeCauseDrillLessonAsync(
+        MistakeCauseDrillRequest request,
+        int targetCharacters,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await _appSettingsRepository.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
+        var seed = request.RandomSeed ?? CreateStableSeed(
+            request.Cause,
+            string.Join(string.Empty, request.TargetCharacters),
+            string.Join('|', request.TargetBigrams));
+        var generator = new MistakeCauseDrillGenerator();
+
+        return generator.Generate(
+            request with
+            {
+                AllowCapitalLetters = settings.AllowCapitalLetters,
+                AllowNumbers = settings.AllowNumbers,
+                AllowPunctuation = settings.AllowPunctuation,
+                RandomSeed = seed
+            },
+            Math.Clamp(targetCharacters, 40, 800));
+    }
+
     private static LessonGenerationOptions CreateOptions(LessonMode mode, AppSettings settings, int targetCharacters)
     {
         return new LessonGenerationOptions(
@@ -233,9 +262,15 @@ public sealed class LessonService : ILessonService
         string text,
         bool normalizeToAscii,
         bool normalizeWhitespace,
-        bool lowercase)
+        bool lowercase,
+        bool stripPunctuation)
     {
         var normalized = normalizeToAscii ? AsciiTextNormalizer.ToAscii(text) : text;
+        if (stripPunctuation)
+        {
+            normalized = ParagraphChunker.StripPunctuation(normalized);
+        }
+
         if (lowercase)
         {
             normalized = normalized.ToLowerInvariant();

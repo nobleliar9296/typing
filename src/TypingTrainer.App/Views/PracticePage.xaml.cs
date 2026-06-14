@@ -3,9 +3,11 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Navigation;
 using System.ComponentModel;
 using System.Diagnostics;
 using TypingTrainer.App.Controls;
+using TypingTrainer.App.Navigation;
 using TypingTrainer.App.ViewModels;
 using TypingTrainer.Core.Lessons;
 using Windows.ApplicationModel.DataTransfer;
@@ -25,6 +27,7 @@ public sealed partial class PracticePage : Page
     private readonly SolidColorBrush _mistakeBorderBrush = new(Color.FromArgb(255, 196, 43, 55));
     private Brush? _defaultInputBorderBrush;
     private double? _lastScrollTarget;
+    private PracticeLaunchRequest? _pendingLaunchRequest;
 
     public PracticePage()
     {
@@ -48,6 +51,20 @@ public sealed partial class PracticePage : Page
 
     public PracticeViewModel ViewModel { get; }
 
+    protected override async void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+
+        if (e.Parameter is PracticeLaunchRequest request)
+        {
+            _pendingLaunchRequest = request;
+            if (_isLoaded)
+            {
+                await ApplyLaunchRequestAsync(request);
+            }
+        }
+    }
+
     private async void PracticePage_Loaded(object sender, RoutedEventArgs e)
     {
         _defaultInputBorderBrush ??= InputBorder.BorderBrush;
@@ -55,17 +72,13 @@ public sealed partial class PracticePage : Page
         if (!_isLoaded)
         {
             await ViewModel.InitializeAsync();
-            LessonModeComboBox.SelectedIndex = ViewModel.SelectedLessonMode switch
-            {
-                LessonMode.Paragraph => 1,
-                LessonMode.WeakKeys => 2,
-                LessonMode.WeakBigrams => 3,
-                LessonMode.Review => 4,
-                LessonMode.Clipboard => 5,
-                LessonMode.Fixed => 6,
-                _ => 0
-            };
+            SyncLessonSelectors();
             _isLoaded = true;
+        }
+
+        if (_pendingLaunchRequest is not null)
+        {
+            await ApplyLaunchRequestAsync(_pendingLaunchRequest);
         }
 
         ApplyResponsiveLayout(ActualWidth, ActualHeight);
@@ -180,9 +193,15 @@ public sealed partial class PracticePage : Page
     private async void PracticeMistakesButton_Click(object sender, RoutedEventArgs e)
     {
         await ViewModel.PracticeMistakesAsync();
-        _suppressLessonSelectionChanges = true;
-        LessonModeComboBox.SelectedIndex = 4;
-        _suppressLessonSelectionChanges = false;
+        SyncLessonSelectors();
+        FocusTypingSurface(FocusState.Programmatic);
+        QueueScrollToCursor(animate: false);
+    }
+
+    private async void RecommendedFollowUpButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.StartRecommendedFollowUpAsync();
+        SyncLessonSelectors();
         FocusTypingSurface(FocusState.Programmatic);
         QueueScrollToCursor(animate: false);
     }
@@ -258,7 +277,7 @@ public sealed partial class PracticePage : Page
 
     private async void LessonSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_isLoaded)
+        if (!_isLoaded || _suppressLessonSelectionChanges)
         {
             return;
         }
@@ -273,6 +292,37 @@ public sealed partial class PracticePage : Page
         await ViewModel.ChangeLessonSizeAsync(size);
         FocusTypingSurface(FocusState.Programmatic);
         QueueScrollToCursor(animate: false);
+    }
+
+    private async Task ApplyLaunchRequestAsync(PracticeLaunchRequest request)
+    {
+        _pendingLaunchRequest = null;
+        await ViewModel.ApplyLaunchRequestAsync(request);
+        SyncLessonSelectors();
+        FocusTypingSurface(FocusState.Programmatic);
+        QueueScrollToCursor(animate: false);
+    }
+
+    private void SyncLessonSelectors()
+    {
+        _suppressLessonSelectionChanges = true;
+        LessonModeComboBox.SelectedIndex = ViewModel.SelectedLessonMode switch
+        {
+            LessonMode.Paragraph => 1,
+            LessonMode.WeakKeys => 2,
+            LessonMode.WeakBigrams => 3,
+            LessonMode.Review => 4,
+            LessonMode.Clipboard => 5,
+            LessonMode.Fixed => 6,
+            _ => 0
+        };
+        LessonSizeComboBox.SelectedIndex = ViewModel.SelectedLessonSize switch
+        {
+            PracticeLessonSize.Medium => 1,
+            PracticeLessonSize.Long => 2,
+            _ => 0
+        };
+        _suppressLessonSelectionChanges = false;
     }
 
     private void PracticeRoot_SizeChanged(object sender, SizeChangedEventArgs e)

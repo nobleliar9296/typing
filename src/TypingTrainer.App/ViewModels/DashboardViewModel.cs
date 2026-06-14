@@ -2,8 +2,10 @@ using Microsoft.UI.Xaml;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using TypingTrainer.App.Navigation;
 using TypingTrainer.Core.Coaching;
 using TypingTrainer.Core.Keyboard;
+using TypingTrainer.Core.Lessons;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Data.Repositories;
 using TypingTrainer.Data.Services;
@@ -262,6 +264,26 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             step.RecommendedMode.ToString(),
             $"{step.Minutes} min"))
         .ToArray();
+
+    public PracticeLaunchRequest CreateDailyPlanLaunchRequest()
+    {
+        var plan = DailyPlan;
+        var step = plan.Steps.FirstOrDefault();
+        if (step is null)
+        {
+            return new PracticeLaunchRequest(
+                LessonMode.Adaptive,
+                PracticeLessonSize.Small,
+                TargetCharacters: null,
+                Reason: "Today's plan: adaptive practice");
+        }
+
+        return new PracticeLaunchRequest(
+            step.RecommendedMode,
+            GetPracticeSize(step.TargetLength),
+            Math.Max(20, step.TargetLength),
+            $"Today's plan: {step.Title} - {step.Description}");
+    }
 
     public IReadOnlyList<AchievementDisplayRow> AchievementRows => _achievementEvaluator
         .Evaluate(BuildCoachingStats())
@@ -790,6 +812,21 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             >= 0.34 => "Steady",
             _ => "Improving"
         };
+    }
+
+    private static PracticeLessonSize GetPracticeSize(int targetCharacters)
+    {
+        if (targetCharacters >= PracticeLessonSizeTargets.LongTargetCharacters)
+        {
+            return PracticeLessonSize.Long;
+        }
+
+        if (targetCharacters >= PracticeLessonSizeTargets.MediumTargetCharacters)
+        {
+            return PracticeLessonSize.Medium;
+        }
+
+        return PracticeLessonSize.Small;
     }
 
     private static double? AnalyticsMedian(IEnumerable<double> values)

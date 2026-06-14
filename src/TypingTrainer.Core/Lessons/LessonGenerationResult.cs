@@ -1,3 +1,5 @@
+using TypingTrainer.Core.Learning;
+
 namespace TypingTrainer.Core.Lessons;
 
 public sealed record LessonGenerationResult(
@@ -7,4 +9,9 @@ public sealed record LessonGenerationResult(
     IReadOnlyList<string> FocusBigrams,
     string Reason,
     string? ContentTitle = null,
-    string? ContentSource = null);
+    string? ContentSource = null,
+    IReadOnlyList<LearningTarget>? LearningTargets = null)
+{
+    public IReadOnlyList<LearningTarget> LearningTargets { get; init; } =
+        LearningTargets ?? Array.Empty<LearningTarget>();
+}

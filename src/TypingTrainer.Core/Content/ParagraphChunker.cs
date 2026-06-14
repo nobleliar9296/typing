@@ -10,7 +10,8 @@ public static class ParagraphChunker
         int maxParagraphCharacters,
         bool normalizeWhitespace,
         bool lowercaseWhenImported,
-        bool normalizeToAscii = true)
+        bool normalizeToAscii = true,
+        bool stripPunctuation = false)
     {
         var builder = new StringBuilder();
 
@@ -18,7 +19,7 @@ public static class ParagraphChunker
         {
             if (string.IsNullOrWhiteSpace(line))
             {
-                foreach (var paragraph in Flush(builder, minParagraphCharacters, maxParagraphCharacters, normalizeWhitespace, lowercaseWhenImported, normalizeToAscii))
+                foreach (var paragraph in Flush(builder, minParagraphCharacters, maxParagraphCharacters, normalizeWhitespace, lowercaseWhenImported, normalizeToAscii, stripPunctuation))
                 {
                     yield return paragraph;
                 }
@@ -34,10 +35,26 @@ public static class ParagraphChunker
             builder.Append(line.Trim());
         }
 
-        foreach (var paragraph in Flush(builder, minParagraphCharacters, maxParagraphCharacters, normalizeWhitespace, lowercaseWhenImported, normalizeToAscii))
+        foreach (var paragraph in Flush(builder, minParagraphCharacters, maxParagraphCharacters, normalizeWhitespace, lowercaseWhenImported, normalizeToAscii, stripPunctuation))
         {
             yield return paragraph;
         }
+    }
+
+    public static string StripPunctuation(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        foreach (var character in text)
+        {
+            builder.Append(char.IsPunctuation(character) ? ' ' : character);
+        }
+
+        return NormalizeWhitespace(builder.ToString());
     }
 
     public static IEnumerable<string> SplitLongParagraph(string paragraph, int maxParagraphCharacters)
@@ -73,7 +90,8 @@ public static class ParagraphChunker
         int maxParagraphCharacters,
         bool normalizeWhitespace,
         bool lowercaseWhenImported,
-        bool normalizeToAscii)
+        bool normalizeToAscii,
+        bool stripPunctuation)
     {
         if (builder.Length == 0)
         {
@@ -95,6 +113,11 @@ public static class ParagraphChunker
         if (normalizeWhitespace)
         {
             paragraph = NormalizeWhitespace(paragraph);
+        }
+
+        if (stripPunctuation)
+        {
+            paragraph = StripPunctuation(paragraph);
         }
 
         if (lowercaseWhenImported)

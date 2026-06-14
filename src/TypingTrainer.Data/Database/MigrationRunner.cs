@@ -135,6 +135,46 @@ public sealed class MigrationRunner
             await insertVersionCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        if (currentVersion < 3)
+        {
+            await ExecuteAsync(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS learning_items (
+                    target_type TEXT NOT NULL,
+                    target TEXT NOT NULL,
+                    exposure_count INTEGER NOT NULL,
+                    correct_count INTEGER NOT NULL,
+                    incorrect_count INTEGER NOT NULL,
+                    accuracy REAL NOT NULL,
+                    median_latency_ms REAL,
+                    weakness_score REAL NOT NULL,
+                    stability_score REAL NOT NULL,
+                    mastery_state TEXT NOT NULL,
+                    interval_days INTEGER NOT NULL,
+                    ease_factor REAL NOT NULL,
+                    last_seen_utc TEXT NOT NULL,
+                    next_due_utc TEXT NOT NULL,
+                    primary_mistake_cause TEXT NOT NULL,
+                    cause_counts_json TEXT NOT NULL,
+                    PRIMARY KEY (target_type, target)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_learning_items_due
+                ON learning_items(next_due_utc);
+
+                CREATE INDEX IF NOT EXISTS idx_learning_items_mastery
+                ON learning_items(mastery_state);
+                """, cancellationToken).ConfigureAwait(false);
+
+            await using var insertVersionCommand = connection.CreateCommand();
+            insertVersionCommand.Transaction = (SqliteTransaction)transaction;
+            insertVersionCommand.CommandText = """
+                INSERT OR IGNORE INTO schema_version (version, applied_at_utc)
+                VALUES (3, $appliedAtUtc);
+                """;
+            insertVersionCommand.Parameters.AddWithValue("$appliedAtUtc", DateTimeOffset.UtcNow.ToString("O"));
+            await insertVersionCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 

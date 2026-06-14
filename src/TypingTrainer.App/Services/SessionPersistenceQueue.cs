@@ -10,12 +10,16 @@ namespace TypingTrainer.App.Services;
 public sealed class SessionPersistenceQueue : ISessionPersistenceQueue
 {
     private readonly IPracticeSessionRepository _practiceSessionRepository;
+    private readonly ILearningProgressRepository _learningProgressRepository;
     private readonly Channel<PendingSession> _channel;
     private readonly ConcurrentDictionary<Guid, Task> _pendingTasks = new();
 
-    public SessionPersistenceQueue(IPracticeSessionRepository practiceSessionRepository)
+    public SessionPersistenceQueue(
+        IPracticeSessionRepository practiceSessionRepository,
+        ILearningProgressRepository learningProgressRepository)
     {
         _practiceSessionRepository = practiceSessionRepository;
+        _learningProgressRepository = learningProgressRepository;
         _channel = Channel.CreateUnbounded<PendingSession>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -74,6 +78,9 @@ public sealed class SessionPersistenceQueue : ISessionPersistenceQueue
 
                 await _practiceSessionRepository
                     .SaveCompletedSessionAsync(storedSession, storedEvents)
+                    .ConfigureAwait(false);
+                await _learningProgressRepository
+                    .UpdateFromCompletedSessionAsync(storedSession, storedEvents)
                     .ConfigureAwait(false);
 
                 pendingSession.Completion.TrySetResult();

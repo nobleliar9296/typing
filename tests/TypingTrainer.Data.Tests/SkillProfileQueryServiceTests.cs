@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using TypingTrainer.Core.Learning;
 using TypingTrainer.Data.Database;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Data.Repositories;
@@ -95,6 +96,31 @@ public sealed class SkillProfileQueryServiceTests
         Assert.AreEqual(TimeSpan.FromMinutes(3), profile.TotalPracticeTime);
     }
 
+    [TestMethod]
+    public async Task SkillProfileQueryService_ReturnsDueLearningTargets()
+    {
+        await using var database = await SkillProfileTestDatabase.CreateInitializedAsync(NowUtc);
+        var session = CreateSession("fffff", durationMs: 30_000);
+        var events = Enumerable.Range(0, 5)
+            .Select(index => CharacterEvent(
+                session.Id,
+                index,
+                'f',
+                index < 3 ? 'f' : 'g',
+                isCorrect: index < 3,
+                deltaPreviousMs: 120,
+                timestampTicks: index + 1))
+            .ToArray();
+
+        await database.SaveAndUpdateLearningAsync(session, events);
+
+        var profile = await database.SkillProfile.GetUserSkillProfileAsync();
+
+        Assert.IsTrue(profile.DueLearningTargets.Any(target =>
+            target.Type == LearningItemType.Character && target.Target == "f"));
+        Assert.IsTrue(profile.MasterySummary.DueCount > 0);
+    }
+
     private static StoredPracticeSession CreateSession(string targetText, long durationMs = 60_000)
     {
         return new StoredPracticeSession(
@@ -144,16 +170,20 @@ public sealed class SkillProfileQueryServiceTests
         private SkillProfileTestDatabase(
             string directoryPath,
             PracticeSessionRepository repository,
+            LearningProgressRepository learningProgress,
             SkillProfileQueryService skillProfile)
         {
             DirectoryPath = directoryPath;
             Repository = repository;
+            LearningProgress = learningProgress;
             SkillProfile = skillProfile;
         }
 
         public string DirectoryPath { get; }
 
         public PracticeSessionRepository Repository { get; }
+
+        public LearningProgressRepository LearningProgress { get; }
 
         public SkillProfileQueryService SkillProfile { get; }
 
@@ -167,9 +197,10 @@ public sealed class SkillProfileQueryServiceTests
             await initializer.InitializeAsync();
 
             var repository = new PracticeSessionRepository(connectionFactory);
+            var learningProgress = new LearningProgressRepository(connectionFactory, new FixedUtcClock(nowUtc));
             var skillProfile = new SkillProfileQueryService(connectionFactory, new FixedUtcClock(nowUtc));
 
-            return new SkillProfileTestDatabase(directoryPath, repository, skillProfile);
+            return new SkillProfileTestDatabase(directoryPath, repository, learningProgress, skillProfile);
         }
 
         public Task SaveAsync(StoredPracticeSession session)
@@ -180,6 +211,12 @@ public sealed class SkillProfileQueryServiceTests
         public Task SaveAsync(StoredPracticeSession session, IReadOnlyList<StoredKeyEvent> events)
         {
             return Repository.SaveCompletedSessionAsync(session, events);
+        }
+
+        public async Task SaveAndUpdateLearningAsync(StoredPracticeSession session, IReadOnlyList<StoredKeyEvent> events)
+        {
+            await Repository.SaveCompletedSessionAsync(session, events);
+            await LearningProgress.UpdateFromCompletedSessionAsync(session, events);
         }
 
         public ValueTask DisposeAsync()

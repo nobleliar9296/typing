@@ -3,8 +3,11 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using TypingTrainer.App.Navigation;
 using TypingTrainer.App.Services;
+using TypingTrainer.Core.Coaching;
 using TypingTrainer.Core.Keyboard;
+using TypingTrainer.Core.Learning;
 using TypingTrainer.Core.Lessons;
 using TypingTrainer.Core.Models;
 using TypingTrainer.Core.Review;
@@ -50,6 +53,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     private SessionSummary? _lastSummary;
     private SessionReview? _lastReview;
     private IReadOnlyList<TypingInputEvent> _lastCompletedEvents = Array.Empty<TypingInputEvent>();
+    private IReadOnlyList<LearningTarget> _completedLearningTargets = Array.Empty<LearningTarget>();
     private AppSettings _settings = AppSettings.Defaults;
 
     public PracticeViewModel(
@@ -405,6 +409,18 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<CostlyMistakeRow> CostlyMistakeRows => BuildCostlyMistakeRows(_lastCompletedEvents);
 
+    public IReadOnlyList<MistakeCauseRow> MistakeCauseRows => BuildMistakeCauseRows(_lastSummary, _lastCompletedEvents);
+
+    public Visibility MistakeCauseVisibility => MistakeCauseRows.Count > 0
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public IReadOnlyList<LearningFocusRow> LearningFocusRows => BuildLearningFocusRows(_completedLearningTargets);
+
+    public Visibility LearningFocusVisibility => LearningFocusRows.Count > 0
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
     public string ReviewRecommendationTitle => BuildReviewRecommendation().Title;
 
     public string ReviewRecommendationDetail => BuildReviewRecommendation().Detail;
@@ -439,6 +455,14 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         ? Visibility.Visible
         : Visibility.Collapsed;
 
+    public string RecommendedFollowUpText => BuildRecommendedFollowUp().ButtonText;
+
+    public string RecommendedFollowUpDetail => BuildRecommendedFollowUp().Detail;
+
+    public Visibility RecommendedFollowUpVisibility => _lastSummary is null
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         _settings = await _lessonService.GetSettingsAsync(cancellationToken);
@@ -456,6 +480,40 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     {
         SelectedLessonSize = size;
         await GenerateNextLessonAsync(cancellationToken);
+    }
+
+    public async Task ApplyLaunchRequestAsync(
+        PracticeLaunchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            IsGeneratingLesson = true;
+            CompletionStatus = "Starting practice...";
+            _settings = await _lessonService.GetSettingsAsync(cancellationToken);
+            SelectedLessonMode = request.Mode == LessonMode.Clipboard
+                ? LessonMode.Adaptive
+                : request.Mode;
+            SelectedLessonSize = request.Size;
+            var targetCharacters = request.TargetCharacters
+                ?? PracticeLessonSizeTargets.GetTargetCharacters(
+                    SelectedLessonSize,
+                    _settings.LessonLengthCharacters);
+            var lesson = await _lessonService.GenerateNextLessonAsync(
+                SelectedLessonMode,
+                targetCharacters,
+                cancellationToken);
+            if (!string.IsNullOrWhiteSpace(request.Reason))
+            {
+                lesson = lesson with { Reason = request.Reason };
+            }
+
+            StartSession(lesson, SelectedLessonMode);
+        }
+        finally
+        {
+            IsGeneratingLesson = false;
+        }
     }
 
     public async Task GenerateNextLessonAsync(CancellationToken cancellationToken = default)
@@ -526,6 +584,47 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         }
     }
 
+    public async Task StartRecommendedFollowUpAsync(CancellationToken cancellationToken = default)
+    {
+        var followUp = BuildRecommendedFollowUp();
+        switch (followUp.Kind)
+        {
+            case RecommendedFollowUpKind.SpacedReview:
+                await ApplyLaunchRequestAsync(
+                    new PracticeLaunchRequest(
+                        LessonMode.Adaptive,
+                        PracticeLessonSize.Small,
+                        TargetCharacters: null,
+                        Reason: followUp.Detail),
+                    cancellationToken);
+                break;
+            case RecommendedFollowUpKind.MistakeCauseDrill:
+                if (!await StartMistakeCauseDrillAsync(cancellationToken))
+                {
+                    await PracticeMistakesOrNextAsync(cancellationToken);
+                }
+
+                break;
+            case RecommendedFollowUpKind.WpmDipRetry:
+                if (followUp.ChartPointIndex is int pointIndex && StartRetryFromNetWpmPoint(pointIndex))
+                {
+                    return;
+                }
+
+                await PracticeMistakesOrNextAsync(cancellationToken);
+                break;
+            case RecommendedFollowUpKind.PracticeMistakes:
+                await PracticeMistakesAsync(cancellationToken);
+                break;
+            case RecommendedFollowUpKind.NextParagraph:
+            default:
+                SelectedLessonMode = LessonMode.Paragraph;
+                SelectedLessonSize = PracticeLessonSize.Small;
+                await GenerateNextLessonAsync(cancellationToken);
+                break;
+        }
+    }
+
     public async Task StartClipboardLessonAsync(string clipboardText, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(clipboardText))
@@ -592,6 +691,50 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         return true;
     }
 
+    private async Task PracticeMistakesOrNextAsync(CancellationToken cancellationToken)
+    {
+        if (CanPracticeMistakes)
+        {
+            await PracticeMistakesAsync(cancellationToken);
+            return;
+        }
+
+        SelectedLessonMode = LessonMode.Paragraph;
+        SelectedLessonSize = PracticeLessonSize.Small;
+        await GenerateNextLessonAsync(cancellationToken);
+    }
+
+    private async Task<bool> StartMistakeCauseDrillAsync(CancellationToken cancellationToken)
+    {
+        var request = BuildTopMistakeCauseDrillRequest();
+        if (request is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            IsGeneratingLesson = true;
+            CompletionStatus = "Generating micro-drill...";
+            _settings = await _lessonService.GetSettingsAsync(cancellationToken);
+            var targetCharacters = PracticeLessonSizeTargets.GetTargetCharacters(
+                PracticeLessonSize.Small,
+                _settings.LessonLengthCharacters);
+            var lesson = await _lessonService.GenerateMistakeCauseDrillLessonAsync(
+                request,
+                targetCharacters,
+                cancellationToken);
+            SelectedLessonMode = LessonMode.Review;
+            SelectedLessonSize = PracticeLessonSize.Small;
+            StartSession(lesson, LessonMode.Review);
+            return true;
+        }
+        finally
+        {
+            IsGeneratingLesson = false;
+        }
+    }
+
     public string CreateReviewSummaryText()
     {
         var lines = new List<string>
@@ -638,6 +781,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _lastSummary = null;
         _lastReview = null;
         _lastCompletedEvents = Array.Empty<TypingInputEvent>();
+        _completedLearningTargets = Array.Empty<LearningTarget>();
         _sessionNetWpmSamples.Clear();
         CompletionStatus = string.Empty;
         PauseStatus = string.Empty;
@@ -779,6 +923,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
                 CurrentState = completedSession.GetSnapshot(timestampTicks);
                 _lastSummary = summary;
                 _lastCompletedEvents = events;
+                _completedLearningTargets = Array.Empty<LearningTarget>();
                 _lastReview = _reviewGenerator.Generate(summary, events);
                 OnCompletionChanged();
                 OnReviewChanged();
@@ -791,10 +936,20 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
                     events,
                     completedMode.ToString());
 
-                SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Queued for local save.");
+                SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Updating learning plan...");
+                await _sessionPersistenceQueue.FlushAsync();
+                var profile = await _lessonService.GetSkillProfileAsync();
+                if (IsCurrentCompletion(completedGeneration))
+                {
+                    _completedLearningTargets = profile.DueLearningTargets.Take(6).ToArray();
+                    OnReviewChanged();
+                }
+
+                SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Saved locally.");
             }
             else
             {
+                _completedLearningTargets = Array.Empty<LearningTarget>();
                 SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Auto-save is off.");
             }
         }
@@ -855,12 +1010,19 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
     {
         OnPropertyChanged(nameof(ReviewRows));
         OnPropertyChanged(nameof(CostlyMistakeRows));
+        OnPropertyChanged(nameof(MistakeCauseRows));
+        OnPropertyChanged(nameof(MistakeCauseVisibility));
+        OnPropertyChanged(nameof(LearningFocusRows));
+        OnPropertyChanged(nameof(LearningFocusVisibility));
         OnPropertyChanged(nameof(ReviewRecommendationTitle));
         OnPropertyChanged(nameof(ReviewRecommendationDetail));
         OnPropertyChanged(nameof(ReviewNotes));
         OnPropertyChanged(nameof(ReviewVisibility));
         OnPropertyChanged(nameof(CanPracticeMistakes));
         OnPropertyChanged(nameof(PracticeMistakesVisibility));
+        OnPropertyChanged(nameof(RecommendedFollowUpText));
+        OnPropertyChanged(nameof(RecommendedFollowUpDetail));
+        OnPropertyChanged(nameof(RecommendedFollowUpVisibility));
     }
 
     private void OnSessionNetWpmChanged()
@@ -1005,11 +1167,75 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         return TimeSpan.FromMilliseconds(elapsedMs).ToString(@"m\:ss", CultureInfo.InvariantCulture);
     }
 
+    private RecommendedFollowUp BuildRecommendedFollowUp()
+    {
+        if (_lastSummary is null)
+        {
+            return new RecommendedFollowUp(
+                RecommendedFollowUpKind.None,
+                "Do This Next",
+                "Complete a session to unlock a targeted next step.",
+                ChartPointIndex: null);
+        }
+
+        if (_completedLearningTargets.Count > 0)
+        {
+            var first = _completedLearningTargets[0];
+            return new RecommendedFollowUp(
+                RecommendedFollowUpKind.SpacedReview,
+                "Do This Next",
+                $"Spaced review: practice {FormatLearningTarget(first)} while it is due.",
+                ChartPointIndex: null);
+        }
+
+        var drillRequest = BuildTopMistakeCauseDrillRequest();
+        if (drillRequest is not null)
+        {
+            return new RecommendedFollowUp(
+                RecommendedFollowUpKind.MistakeCauseDrill,
+                "Do This Next",
+                $"Micro-drill: {FormatMistakeCause(drillRequest.Cause).ToLowerInvariant()} for {FormatDrillTargets(drillRequest)}.",
+                ChartPointIndex: null);
+        }
+
+        var dipIndex = GetLowestStableNetWpmPointIndex();
+        if (dipIndex is int pointIndex)
+        {
+            var sample = GetSessionNetWpmChartSamples()[pointIndex];
+            return new RecommendedFollowUp(
+                RecommendedFollowUpKind.WpmDipRetry,
+                "Do This Next",
+                $"Retry the lowest WPM dip near {FormatElapsedLabel(sample.ElapsedMs)}.",
+                pointIndex);
+        }
+
+        if (CanPracticeMistakes)
+        {
+            return new RecommendedFollowUp(
+                RecommendedFollowUpKind.PracticeMistakes,
+                "Do This Next",
+                "Replay the mistake-heavy parts of the last session.",
+                ChartPointIndex: null);
+        }
+
+        return new RecommendedFollowUp(
+            RecommendedFollowUpKind.NextParagraph,
+            "Do This Next",
+            "Start one short paragraph to build clean flow.",
+            ChartPointIndex: null);
+    }
+
     private (string Title, string Detail) BuildReviewRecommendation()
     {
         if (_lastSummary is null)
         {
             return ("What to fix next", "Complete a session to unlock targeted review guidance.");
+        }
+
+        if (_completedLearningTargets.Count > 0)
+        {
+            var first = _completedLearningTargets[0];
+            return ("Spaced review ready", $"Start with {FormatLearningTarget(first)}; it is due based on mastery and recent mistakes.");
         }
 
         if (HasFatiguePattern(GetSessionNetWpmChartSamples(), _lastCompletedEvents))
@@ -1105,6 +1331,159 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             .OrderByDescending(row => row.ImpactScore)
             .ThenBy(row => row.Label, StringComparer.Ordinal)
             .Take(6)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<MistakeCauseRow> BuildMistakeCauseRows(
+        SessionSummary? summary,
+        IReadOnlyList<TypingInputEvent> events)
+    {
+        if (summary is null)
+        {
+            return Array.Empty<MistakeCauseRow>();
+        }
+
+        var classifier = new MistakeCauseClassifier();
+        var mistakes = events
+            .Where(item => item.Kind == InputEventKind.Character
+                && !item.IsCorrect
+                && item.ExpectedChar is not null
+                && item.ActualChar is not null)
+            .Select(item => new
+            {
+                Event = item,
+                Cause = classifier.Classify(
+                    item.ExpectedChar!.Value,
+                    item.ActualChar!.Value,
+                    item.DeltaFromPreviousMs,
+                    item.ElapsedMs,
+                    summary.DurationMs)
+            })
+            .ToArray();
+
+        if (mistakes.Length == 0)
+        {
+            return Array.Empty<MistakeCauseRow>();
+        }
+
+        return mistakes
+            .GroupBy(item => item.Cause)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => FormatMistakeCause(group.Key), StringComparer.Ordinal)
+            .Take(5)
+            .Select(group =>
+            {
+                var targets = group
+                    .GroupBy(item => item.Event.ExpectedChar!.Value)
+                    .OrderByDescending(targetGroup => targetGroup.Count())
+                    .ThenBy(targetGroup => DisplayChar(targetGroup.Key), StringComparer.Ordinal)
+                    .Take(3)
+                    .Select(targetGroup => DisplayChar(targetGroup.Key));
+                return new MistakeCauseRow(
+                    FormatMistakeCause(group.Key),
+                    group.Count().ToString(CultureInfo.InvariantCulture),
+                    string.Join(", ", targets),
+                    group.Count() * 100.0 / mistakes.Length);
+            })
+            .ToArray();
+    }
+
+    private MistakeCauseDrillRequest? BuildTopMistakeCauseDrillRequest()
+    {
+        if (_lastSummary is null)
+        {
+            return null;
+        }
+
+        var classifier = new MistakeCauseClassifier();
+        var mistakes = _lastCompletedEvents
+            .Where(item => item.Kind == InputEventKind.Character
+                && !item.IsCorrect
+                && item.ExpectedChar is not null
+                && item.ActualChar is not null)
+            .Select(item => new
+            {
+                Event = item,
+                Cause = classifier.Classify(
+                    item.ExpectedChar!.Value,
+                    item.ActualChar!.Value,
+                    item.DeltaFromPreviousMs,
+                    item.ElapsedMs,
+                    _lastSummary.DurationMs)
+            })
+            .ToArray();
+
+        if (mistakes.Length == 0)
+        {
+            return null;
+        }
+
+        var topCause = mistakes
+            .GroupBy(item => item.Cause)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => FormatMistakeCause(group.Key), StringComparer.Ordinal)
+            .First();
+        var targetCharacters = topCause
+            .GroupBy(item => item.Event.ExpectedChar!.Value)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => DisplayChar(group.Key), StringComparer.Ordinal)
+            .Select(group => group.Key)
+            .Where(character => !char.IsWhiteSpace(character))
+            .Take(6)
+            .ToArray();
+        var targetBigrams = _lastReview?.FocusBigrams.Take(6).ToArray()
+            ?? Array.Empty<string>();
+
+        return new MistakeCauseDrillRequest(
+            topCause.Key,
+            targetCharacters,
+            targetBigrams,
+            _settings.AllowCapitalLetters,
+            _settings.AllowNumbers,
+            _settings.AllowPunctuation);
+    }
+
+    private int? GetLowestStableNetWpmPointIndex()
+    {
+        var samples = GetSessionNetWpmChartSamples();
+        if (samples.Count < 2)
+        {
+            return null;
+        }
+
+        return samples
+            .Select((sample, index) => new { sample.NetWpm, Index = index })
+            .OrderBy(item => item.NetWpm)
+            .First()
+            .Index;
+    }
+
+    private static string FormatDrillTargets(MistakeCauseDrillRequest request)
+    {
+        var targets = request.TargetCharacters
+            .Select(DisplayChar)
+            .Concat(request.TargetBigrams)
+            .Where(target => !string.IsNullOrWhiteSpace(target))
+            .Distinct(StringComparer.Ordinal)
+            .Take(4)
+            .ToArray();
+
+        return targets.Length == 0
+            ? "controlled flow"
+            : string.Join(", ", targets);
+    }
+
+    private static IReadOnlyList<LearningFocusRow> BuildLearningFocusRows(IReadOnlyList<LearningTarget> targets)
+    {
+        return targets
+            .Take(6)
+            .Select(target => new LearningFocusRow(
+                FormatLearningTarget(target),
+                target.Type == LearningItemType.Character ? "Key" : "Bigram",
+                FormatMasteryState(target.MasteryState),
+                FormatMistakeCause(target.PrimaryMistakeCause),
+                FormatPercent(target.Accuracy),
+                target.NextDueUtc is null ? "Due" : "Due now"))
             .ToArray();
     }
 
@@ -1215,6 +1594,39 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         };
     }
 
+    private static string FormatLearningTarget(LearningTarget target)
+    {
+        return target.Type == LearningItemType.Character && target.Target == " "
+            ? "Space"
+            : target.Target;
+    }
+
+    private static string FormatMistakeCause(MistakeCause cause)
+    {
+        return cause switch
+        {
+            MistakeCause.AdjacentKey => "Adjacent key",
+            MistakeCause.SameFinger => "Same finger",
+            MistakeCause.WrongHand => "Wrong hand",
+            MistakeCause.ShiftIssue => "Shift issue",
+            MistakeCause.NumberRow => "Number row",
+            _ => cause.ToString()
+        };
+    }
+
+    private static string FormatMasteryState(MasteryState state)
+    {
+        return state switch
+        {
+            MasteryState.New => "New",
+            MasteryState.Learning => "Learning",
+            MasteryState.Unstable => "Unstable",
+            MasteryState.Mastered => "Mastered",
+            MasteryState.Regressing => "Regressing",
+            _ => state.ToString()
+        };
+    }
+
     private TypingSessionOptions CreateTypingSessionOptions()
     {
         return new TypingSessionOptions(
@@ -1232,6 +1644,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _lastSummary = null;
         _lastReview = null;
         _lastCompletedEvents = Array.Empty<TypingInputEvent>();
+        _completedLearningTargets = Array.Empty<LearningTarget>();
         _lastEscapeTimestampTicks = null;
         _hasStartedTyping = false;
         _countdownRemaining = 0;
@@ -1301,11 +1714,41 @@ public sealed record CostlyMistakeRow(
     public double ImpactPercent => Math.Clamp(ImpactScore, 0, 100);
 }
 
+public sealed record MistakeCauseRow(
+    string Cause,
+    string Count,
+    string Targets,
+    double Percent);
+
+public sealed record LearningFocusRow(
+    string Target,
+    string Kind,
+    string State,
+    string Cause,
+    string Accuracy,
+    string Due);
+
 public sealed record SessionNetWpmSample(
     double ElapsedMs,
     double NetWpm,
     int CursorIndex,
     int TypedKeypresses);
+
+internal sealed record RecommendedFollowUp(
+    RecommendedFollowUpKind Kind,
+    string ButtonText,
+    string Detail,
+    int? ChartPointIndex);
+
+internal enum RecommendedFollowUpKind
+{
+    None,
+    SpacedReview,
+    MistakeCauseDrill,
+    WpmDipRetry,
+    PracticeMistakes,
+    NextParagraph
+}
 
 public enum PracticeInputFeedback
 {

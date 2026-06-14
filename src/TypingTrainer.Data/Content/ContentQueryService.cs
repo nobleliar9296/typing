@@ -187,7 +187,6 @@ public sealed class ContentQueryService : IContentQueryService
               AND item.kind = 'Paragraph'
               AND ($allowCapitalLetters = 1 OR item.contains_capital_letters = 0)
               AND ($allowNumbers = 1 OR item.contains_numbers = 0)
-              AND ($allowPunctuation = 1 OR item.contains_punctuation = 0)
             ORDER BY
               item.use_count ASC,
               CASE WHEN item.last_used_at_utc IS NULL THEN 0 ELSE 1 END ASC,
@@ -198,7 +197,6 @@ public sealed class ContentQueryService : IContentQueryService
             """;
         command.Parameters.AddWithValue("$allowCapitalLetters", query.AllowCapitalLetters ? 1 : 0);
         command.Parameters.AddWithValue("$allowNumbers", query.AllowNumbers ? 1 : 0);
-        command.Parameters.AddWithValue("$allowPunctuation", query.AllowPunctuation ? 1 : 0);
         command.Parameters.AddWithValue("$targetCharacters", query.TargetCharacters);
 
         var candidates = new List<PracticeContentItem>();
@@ -206,7 +204,12 @@ public sealed class ContentQueryService : IContentQueryService
         {
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                candidates.Add(ReadContentItem(reader));
+                var item = ReadContentItem(reader);
+                var practiceItem = StripPunctuationForPracticeIfNeeded(item, query.AllowPunctuation);
+                if (practiceItem.CharacterCount > 0)
+                {
+                    candidates.Add(practiceItem);
+                }
             }
         }
 
@@ -271,6 +274,35 @@ public sealed class ContentQueryService : IContentQueryService
         return (query.AllowCapitalLetters || !item.ContainsCapitalLetters)
             && (query.AllowNumbers || !item.ContainsNumbers)
             && (query.AllowPunctuation || !item.ContainsPunctuation);
+    }
+
+    private static PracticeContentItem StripPunctuationForPracticeIfNeeded(
+        PracticeContentItem item,
+        bool allowPunctuation)
+    {
+        if (allowPunctuation || !item.ContainsPunctuation)
+        {
+            return item;
+        }
+
+        var text = ParagraphChunker.StripPunctuation(item.Text);
+        var analyzed = ContentAnalyzer.AnalyzeParagraph(
+            item.Id,
+            item.PackId ?? string.Empty,
+            item.Title,
+            text,
+            item.Source);
+
+        return analyzed with
+        {
+            Language = item.Language,
+            License = item.License,
+            Tags = item.Tags,
+            PackId = item.PackId,
+            CreatedAtUtc = item.CreatedAtUtc,
+            LastUsedAtUtc = item.LastUsedAtUtc,
+            UseCount = item.UseCount
+        };
     }
 
     private static IReadOnlyList<PracticeContentItem> SelectUntilTarget(

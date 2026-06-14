@@ -290,7 +290,78 @@
                                     Text="ASCII normalization fixes curly quotes, accents, dashes, and other characters that can be awkward to type."
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     TextWrapping="Wrap" />
+                                <TextBlock
+                                    Text="When Allow punctuation is off, new imports remove punctuation so paragraph mode can still use the text."
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap" />
                             </StackPanel>
+
+                            <Border
+                                Padding="12"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Import preview" FontWeight="SemiBold" />
+                                            <TextBlock
+                                                Text="{Binding ImportPreviewStatus}"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ItemsControl
+                                            Grid.Column="1"
+                                            ItemsSource="{Binding ImportPreviewNotes}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border
+                                                        Padding="7,4"
+                                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="6">
+                                                        <TextBlock
+                                                            Text="{Binding}"
+                                                            FontSize="12"
+                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox
+                                            Header="Original sample"
+                                            Text="{Binding ImportOriginalPreviewText, Mode=OneWay}"
+                                            IsReadOnly="True"
+                                            AcceptsReturn="True"
+                                            TextWrapping="Wrap"
+                                            MaxHeight="132" />
+                                        <TextBox
+                                            Grid.Column="1"
+                                            Header="Typing sample"
+                                            Text="{Binding ImportCleanedPreviewText, Mode=OneWay}"
+                                            IsReadOnly="True"
+                                            AcceptsReturn="True"
+                                            TextWrapping="Wrap"
+                                            MaxHeight="132" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
 
                             <Grid ColumnSpacing="8" RowSpacing="8">
                                 <Grid.RowDefinitions>

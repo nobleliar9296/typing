@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Text.Json;
+using TypingTrainer.Core.Learning;
 using TypingTrainer.Data.Database;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Data.Repositories;
@@ -19,12 +20,12 @@ public sealed class PersistenceTests
         var tableNames = await database.GetTableNamesAsync();
 
         CollectionAssert.IsSubsetOf(
-            new[] { "schema_version", "practice_sessions", "key_events", "content_packs", "practice_content_items", "app_settings" },
+            new[] { "schema_version", "practice_sessions", "key_events", "content_packs", "practice_content_items", "app_settings", "learning_items" },
             tableNames.ToArray());
     }
 
     [TestMethod]
-    public async Task DatabaseInitializer_RecordsSchemaVersionTwo()
+    public async Task DatabaseInitializer_RecordsSchemaVersionThree()
     {
         await using var database = await TestDatabase.CreateInitializedAsync();
 
@@ -34,7 +35,7 @@ public sealed class PersistenceTests
 
         var version = Convert.ToInt32(await command.ExecuteScalarAsync());
 
-        Assert.AreEqual(2, version);
+        Assert.AreEqual(3, version);
     }
 
     [TestMethod]
@@ -101,6 +102,34 @@ public sealed class PersistenceTests
 
         Assert.IsNull(storedSession);
         Assert.AreEqual(0, storedEvents.Count);
+    }
+
+    [TestMethod]
+    public async Task LearningProgressRepository_UpdateFromCompletedSession_UpsertsLearningItems()
+    {
+        await using var database = await TestDatabase.CreateInitializedAsync();
+        var session = CreateSession();
+        var events = CreateEvents(session.Id);
+
+        await database.Repository.SaveCompletedSessionAsync(session, events);
+        await database.LearningProgress.UpdateFromCompletedSessionAsync(session, events);
+
+        await using var connection = await database.ConnectionFactory.OpenConnectionAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT target_type, target, exposure_count, incorrect_count, mastery_state, primary_mistake_cause
+            FROM learning_items
+            WHERE target_type = 'Character' AND target = 'b';
+            """;
+
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.IsTrue(await reader.ReadAsync());
+        Assert.AreEqual("Character", reader.GetString(0));
+        Assert.AreEqual("b", reader.GetString(1));
+        Assert.AreEqual(1, reader.GetInt32(2));
+        Assert.AreEqual(1, reader.GetInt32(3));
+        Assert.AreEqual(MasteryState.New.ToString(), reader.GetString(4));
+        Assert.AreEqual(MistakeCause.Other.ToString(), reader.GetString(5));
     }
 
     [TestMethod]
@@ -186,6 +215,7 @@ public sealed class PersistenceTests
             DirectoryPath = directoryPath;
             ConnectionFactory = connectionFactory;
             Repository = new PracticeSessionRepository(connectionFactory);
+            LearningProgress = new LearningProgressRepository(connectionFactory);
         }
 
         public string DirectoryPath { get; }
@@ -193,6 +223,8 @@ public sealed class PersistenceTests
         public SqliteConnectionFactory ConnectionFactory { get; }
 
         public PracticeSessionRepository Repository { get; }
+
+        public LearningProgressRepository LearningProgress { get; }
 
         public static async Task<TestDatabase> CreateInitializedAsync()
         {

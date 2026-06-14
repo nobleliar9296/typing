@@ -411,8 +411,24 @@
                             BorderThickness="1"
                             BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                             CornerRadius="8">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="{Binding ReviewRecommendationTitle}" FontSize="18" FontWeight="SemiBold" />
+                            <StackPanel Spacing="8">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding ReviewRecommendationTitle}" FontSize="18" FontWeight="SemiBold" />
+                                    <Button
+                                        Grid.Column="1"
+                                        Content="{Binding RecommendedFollowUpText}"
+                                        Click="RecommendedFollowUpButton_Click"
+                                        Visibility="{Binding RecommendedFollowUpVisibility}" />
+                                </Grid>
+                                <TextBlock
+                                    Text="{Binding RecommendedFollowUpDetail}"
+                                    Visibility="{Binding RecommendedFollowUpVisibility}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap" />
                                 <TextBlock
                                     Text="{Binding ReviewRecommendationDetail}"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -506,6 +522,84 @@
                                                 <TextBlock Grid.Column="2" Text="{Binding MedianLatencyMs}" />
                                                 <TextBlock Grid.Column="3" Text="{Binding Samples}" />
                                                 <ProgressBar Grid.Column="4" Maximum="100" Value="{Binding ImpactPercent}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                            <StackPanel Spacing="8" Visibility="{Binding MistakeCauseVisibility}">
+                                <TextBlock Text="Mistake causes" FontWeight="SemiBold" />
+                                <ListView ItemsSource="{Binding MistakeCauseRows}" SelectionMode="None" MaxHeight="160">
+                                    <ListView.Header>
+                                        <Grid ColumnSpacing="10" Padding="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Cause" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="1" Text="Count" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="2" Text="Targets" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="3" Text="Share" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </Grid>
+                                    </ListView.Header>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnSpacing="10" Padding="0,7">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="150" />
+                                                    <ColumnDefinition Width="80" />
+                                                    <ColumnDefinition Width="150" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Cause}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Count}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Targets}" TextTrimming="CharacterEllipsis" />
+                                                <ProgressBar Grid.Column="3" Maximum="100" Value="{Binding Percent}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                            <StackPanel Spacing="8" Visibility="{Binding LearningFocusVisibility}">
+                                <TextBlock Text="Learning focus" FontWeight="SemiBold" />
+                                <ListView ItemsSource="{Binding LearningFocusRows}" SelectionMode="None" MaxHeight="180">
+                                    <ListView.Header>
+                                        <Grid ColumnSpacing="10" Padding="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="110" />
+                                                <ColumnDefinition Width="130" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Target" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="1" Text="Type" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="2" Text="State" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="3" Text="Cause" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="4" Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Grid.Column="5" Text="Review" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </Grid>
+                                    </ListView.Header>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnSpacing="10" Padding="0,7">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="100" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="130" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Target}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Kind}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding State}" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Cause}" />
+                                                <TextBlock Grid.Column="4" Text="{Binding Accuracy}" />
+                                                <TextBlock Grid.Column="5" Text="{Binding Due}" />
                                             </Grid>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>

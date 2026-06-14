@@ -98,7 +98,7 @@ public sealed partial class DashboardPage : Page
 
     private void StartDailyPlanButton_Click(object sender, RoutedEventArgs e)
     {
-        NavigateTo(typeof(PracticePage));
+        NavigateTo(typeof(PracticePage), ViewModel.CreateDailyPlanLaunchRequest());
     }
 
     private bool NavigateTo(Type pageType, object? parameter = null)

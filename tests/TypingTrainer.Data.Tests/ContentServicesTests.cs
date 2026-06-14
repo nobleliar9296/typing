@@ -103,6 +103,103 @@ public sealed class ContentServicesTests
     }
 
     [TestMethod]
+    public async Task TextFileImportService_StripsPunctuationWhenRequested()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var filePath = database.CreateTextFile(
+            "punctuation.txt",
+            "Hello, world! It's fine--really; type it now with punctuation removed.");
+
+        await database.ImportService.ImportTextFileAsync(
+            filePath,
+            new TextImportOptions(
+                "No Punctuation",
+                MinParagraphCharacters: 20,
+                StripPunctuation: true));
+
+        var paragraph = await database.ContentQuery.GetNextParagraphAsync(
+            new ParagraphPracticeQuery(
+                TargetCharacters: 200,
+                AllowCapitalLetters: true,
+                AllowNumbers: true,
+                AllowPunctuation: false,
+                UseImportedContent: true,
+                UseBuiltInContent: false));
+
+        Assert.IsNotNull(paragraph);
+        Assert.IsFalse(paragraph.ContainsPunctuation);
+        Assert.IsFalse(paragraph.Text.Any(char.IsPunctuation));
+        Assert.AreEqual("Hello world It s fine really type it now with punctuation removed", paragraph.Text);
+    }
+
+    [TestMethod]
+    public async Task TextFileImportService_PreviewsOriginalAndCleanedSamples()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var filePath = database.CreateTextFile(
+            "preview.txt",
+            "Hello, WORLD! Caf\u00E9 notes should become clean typing text.");
+
+        var preview = await database.ImportService.PreviewTextFileAsync(
+            filePath,
+            new TextImportOptions(
+                "Preview",
+                NormalizeWhitespace: true,
+                LowercaseWhenImported: true,
+                NormalizeToAscii: true,
+                StripPunctuation: true));
+
+        StringAssert.Contains(preview.OriginalSample, "Hello, WORLD!");
+        Assert.AreEqual("hello world cafe notes should become clean typing text", preview.CleanedSample);
+        CollectionAssert.Contains(preview.CleanupNotes.ToArray(), "Punctuation removed");
+    }
+
+    [TestMethod]
+    public async Task TextFileImportService_PreviewMatchesImportedCleanup()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var filePath = database.CreateTextFile(
+            "preview-match.txt",
+            "Hello, world! This imported line should match the preview after cleanup.");
+        var options = new TextImportOptions(
+            "Preview Match",
+            MinParagraphCharacters: 20,
+            NormalizeWhitespace: true,
+            LowercaseWhenImported: true,
+            NormalizeToAscii: true,
+            StripPunctuation: true);
+
+        var preview = await database.ImportService.PreviewTextFileAsync(filePath, options);
+        await database.ImportService.ImportTextFileAsync(filePath, options);
+        var paragraph = await database.ContentQuery.GetNextParagraphAsync(
+            new ParagraphPracticeQuery(
+                TargetCharacters: 200,
+                AllowCapitalLetters: false,
+                AllowNumbers: true,
+                AllowPunctuation: false,
+                UseImportedContent: true,
+                UseBuiltInContent: false));
+
+        Assert.IsNotNull(paragraph);
+        Assert.AreEqual(paragraph.Text, preview.CleanedSample);
+    }
+
+    [TestMethod]
+    public async Task TextFileImportService_PreviewMissingFileReturnsSafeStatus()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var missingPath = Path.Combine(database.DirectoryPath, "missing.txt");
+
+        var preview = await database.ImportService.PreviewTextFileAsync(
+            missingPath,
+            new TextImportOptions("Missing"));
+
+        Assert.AreEqual(string.Empty, preview.OriginalSample);
+        Assert.AreEqual(string.Empty, preview.CleanedSample);
+        StringAssert.Contains(preview.CleanupNotes.Single(), "File not found");
+    }
+
+    [TestMethod]
     public async Task ContentQueryService_ReturnsParagraphMatchingSettings()
     {
         await using var database = await ContentTestDatabase.CreateInitializedAsync();
@@ -128,6 +225,33 @@ public sealed class ContentServicesTests
         Assert.IsNotNull(paragraph);
         Assert.IsFalse(paragraph.ContainsCapitalLetters);
         Assert.IsFalse(paragraph.ContainsPunctuation);
+    }
+
+    [TestMethod]
+    public async Task ContentQueryService_StripsImportedPunctuationWhenDisallowed()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+        var filePath = database.CreateTextFile(
+            "existing-punctuation.txt",
+            "this imported paragraph has commas, periods, and apostrophes so it should still work in paragraph mode");
+
+        await database.ImportService.ImportTextFileAsync(
+            filePath,
+            new TextImportOptions("Existing Punctuation", MinParagraphCharacters: 20));
+
+        var paragraph = await database.ContentQuery.GetNextParagraphAsync(
+            new ParagraphPracticeQuery(
+                TargetCharacters: 120,
+                AllowCapitalLetters: false,
+                AllowNumbers: true,
+                AllowPunctuation: false,
+                UseImportedContent: true,
+                UseBuiltInContent: false));
+
+        Assert.IsNotNull(paragraph);
+        Assert.IsFalse(paragraph.ContainsPunctuation);
+        Assert.IsFalse(paragraph.Text.Any(char.IsPunctuation));
+        StringAssert.Contains(paragraph.Text, "commas periods and apostrophes");
     }
 
     [TestMethod]

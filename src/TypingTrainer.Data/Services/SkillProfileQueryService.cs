@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using TypingTrainer.Core.Learning;
 using TypingTrainer.Core.Skill;
 using TypingTrainer.Data.Database;
 
@@ -29,6 +30,7 @@ public sealed class SkillProfileQueryService : ISkillProfileQueryService
         var characterEvents = await LoadCharacterEventsAsync(connection, cancellationToken).ConfigureAwait(false);
         var characterStats = AnalyticsComputation.BuildCharacterStats(characterEvents);
         var bigramStats = AnalyticsComputation.BuildBigramStats(characterEvents);
+        var learningProfile = await LoadLearningProfileAsync(connection, _clock.UtcNow, cancellationToken).ConfigureAwait(false);
 
         return new UserSkillProfile(
             characterStats
@@ -37,7 +39,9 @@ public sealed class SkillProfileQueryService : ISkillProfileQueryService
             bigramStats.ToDictionary(stat => stat.Bigram, ToBigramSkill),
             summary.CompletedSessionCount,
             TimeSpan.FromMilliseconds(summary.TotalPracticeMs),
-            summary.CreatedAtUtc);
+            summary.CreatedAtUtc,
+            learningProfile.DueTargets,
+            learningProfile.MasterySummary);
     }
 
     private static CharacterSkill ToCharacterSkill(CharacterStat stat)
@@ -136,8 +140,97 @@ public sealed class SkillProfileQueryService : ISkillProfileQueryService
         return events;
     }
 
+    private static async Task<LearningProfileSnapshot> LoadLearningProfileAsync(
+        SqliteConnection connection,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var summary = await LoadMasterySummaryAsync(connection, nowUtc, cancellationToken).ConfigureAwait(false);
+        var dueTargets = await LoadDueTargetsAsync(connection, nowUtc, cancellationToken).ConfigureAwait(false);
+        return new LearningProfileSnapshot(dueTargets, summary);
+    }
+
+    private static async Task<MasterySummary> LoadMasterySummaryAsync(
+        SqliteConnection connection,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT mastery_state,
+                   COUNT(*),
+                   SUM(CASE WHEN next_due_utc <= $nowUtc THEN 1 ELSE 0 END)
+            FROM learning_items
+            GROUP BY mastery_state;
+            """;
+        command.Parameters.AddWithValue("$nowUtc", nowUtc.ToString("O"));
+
+        var counts = new Dictionary<MasteryState, int>();
+        var dueCount = 0;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var state = Enum.Parse<MasteryState>(reader.GetString(0));
+            counts[state] = reader.GetInt32(1);
+            dueCount += reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
+        }
+
+        return new MasterySummary(
+            GetCount(counts, MasteryState.New),
+            GetCount(counts, MasteryState.Learning),
+            GetCount(counts, MasteryState.Unstable),
+            GetCount(counts, MasteryState.Mastered),
+            GetCount(counts, MasteryState.Regressing),
+            dueCount);
+    }
+
+    private static async Task<IReadOnlyList<LearningTarget>> LoadDueTargetsAsync(
+        SqliteConnection connection,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT target_type, target, mastery_state, weakness_score, stability_score,
+                   exposure_count, accuracy, median_latency_ms, next_due_utc, primary_mistake_cause
+            FROM learning_items
+            WHERE next_due_utc <= $nowUtc
+            ORDER BY next_due_utc ASC, weakness_score DESC, stability_score ASC
+            LIMIT 16;
+            """;
+        command.Parameters.AddWithValue("$nowUtc", nowUtc.ToString("O"));
+
+        var targets = new List<LearningTarget>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            targets.Add(new LearningTarget(
+                Enum.Parse<LearningItemType>(reader.GetString(0)),
+                reader.GetString(1),
+                Enum.Parse<MasteryState>(reader.GetString(2)),
+                reader.GetDouble(3),
+                reader.GetDouble(4),
+                reader.GetInt32(5),
+                reader.GetDouble(6),
+                reader.IsDBNull(7) ? null : reader.GetDouble(7),
+                DateTimeOffset.Parse(reader.GetString(8)),
+                Enum.Parse<MistakeCause>(reader.GetString(9))));
+        }
+
+        return targets;
+    }
+
+    private static int GetCount(IReadOnlyDictionary<MasteryState, int> counts, MasteryState state)
+    {
+        return counts.TryGetValue(state, out var count) ? count : 0;
+    }
+
     private sealed record SkillProfileSummary(
         int CompletedSessionCount,
         long TotalPracticeMs,
         DateTime CreatedAtUtc);
+
+    private sealed record LearningProfileSnapshot(
+        IReadOnlyList<LearningTarget> DueTargets,
+        MasterySummary MasterySummary);
 }

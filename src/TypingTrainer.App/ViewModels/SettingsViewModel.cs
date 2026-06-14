@@ -19,12 +19,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     private readonly IPracticeSessionRepository _practiceSessionRepository;
     private readonly ILocalDataBackupService _localDataBackupService;
     private CancellationTokenSource? _importCancellation;
+    private CancellationTokenSource? _importPreviewCancellation;
     private AppSettings _settings = AppSettings.Defaults;
     private IReadOnlyList<ContentPackRow> _contentPacks = Array.Empty<ContentPackRow>();
     private ContentPackRow? _selectedContentPack;
     private string _importFilePath = string.Empty;
     private string _importPackName = string.Empty;
     private string _importStatus = string.Empty;
+    private string _importOriginalPreviewText = string.Empty;
+    private string _importCleanedPreviewText = string.Empty;
+    private string _importPreviewStatus = "Choose a .txt file to preview before importing.";
+    private IReadOnlyList<string> _importPreviewNotes = Array.Empty<string>();
     private bool _isImporting;
     private bool _isLoadingSettings;
     private bool _hasLoadedSettings;
@@ -87,7 +92,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public bool AllowPunctuation
     {
         get => _settings.AllowPunctuation;
-        set => UpdateSettings(_settings with { AllowPunctuation = value });
+        set
+        {
+            var changed = _settings.AllowPunctuation != value;
+            UpdateSettings(_settings with { AllowPunctuation = value });
+            if (changed)
+            {
+                QueueImportPreviewRefresh();
+            }
+        }
     }
 
     public bool UseImportedContent
@@ -256,19 +269,43 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public bool NormalizeImportedTextToAscii
     {
         get => _settings.NormalizeImportedTextToAscii;
-        set => UpdateSettings(_settings with { NormalizeImportedTextToAscii = value });
+        set
+        {
+            var changed = _settings.NormalizeImportedTextToAscii != value;
+            UpdateSettings(_settings with { NormalizeImportedTextToAscii = value });
+            if (changed)
+            {
+                QueueImportPreviewRefresh();
+            }
+        }
     }
 
     public bool LowercaseImportedText
     {
         get => _settings.LowercaseImportedText;
-        set => UpdateSettings(_settings with { LowercaseImportedText = value });
+        set
+        {
+            var changed = _settings.LowercaseImportedText != value;
+            UpdateSettings(_settings with { LowercaseImportedText = value });
+            if (changed)
+            {
+                QueueImportPreviewRefresh();
+            }
+        }
     }
 
     public bool NormalizeImportedWhitespace
     {
         get => _settings.NormalizeImportedWhitespace;
-        set => UpdateSettings(_settings with { NormalizeImportedWhitespace = value });
+        set
+        {
+            var changed = _settings.NormalizeImportedWhitespace != value;
+            UpdateSettings(_settings with { NormalizeImportedWhitespace = value });
+            if (changed)
+            {
+                QueueImportPreviewRefresh();
+            }
+        }
     }
 
     public string ImportFilePath
@@ -285,6 +322,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
                 }
 
                 OnPropertyChanged();
+                QueueImportPreviewRefresh();
             }
         }
     }
@@ -330,6 +368,55 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     }
 
     public Visibility ImportProgressVisibility => IsImporting ? Visibility.Visible : Visibility.Collapsed;
+
+    public string ImportOriginalPreviewText
+    {
+        get => _importOriginalPreviewText;
+        private set
+        {
+            if (_importOriginalPreviewText != value)
+            {
+                _importOriginalPreviewText = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public string ImportCleanedPreviewText
+    {
+        get => _importCleanedPreviewText;
+        private set
+        {
+            if (_importCleanedPreviewText != value)
+            {
+                _importCleanedPreviewText = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public string ImportPreviewStatus
+    {
+        get => _importPreviewStatus;
+        private set
+        {
+            if (_importPreviewStatus != value)
+            {
+                _importPreviewStatus = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public IReadOnlyList<string> ImportPreviewNotes
+    {
+        get => _importPreviewNotes;
+        private set
+        {
+            _importPreviewNotes = value;
+            OnPropertyChanged();
+        }
+    }
 
     public IReadOnlyList<ContentPackDisplayRow> ContentPackRows => ContentPacks
         .Select(pack => new ContentPackDisplayRow(
@@ -455,6 +542,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             _hasLoadedSettings = true;
             SettingsStatus = "Settings autosave is on.";
             OnAllSettingsChanged();
+            QueueImportPreviewRefresh();
         }
         finally
         {
@@ -496,17 +584,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             });
             var result = await _textFileImportService.ImportTextFileAsync(
                 ImportFilePath,
-                new TextImportOptions(
-                    string.IsNullOrWhiteSpace(ImportPackName) ? Path.GetFileNameWithoutExtension(ImportFilePath) : ImportPackName,
-                    MinParagraphCharacters: 80,
-                    MaxParagraphCharacters: 900,
-                    NormalizeWhitespace: _settings.NormalizeImportedWhitespace,
-                    LowercaseWhenImported: _settings.LowercaseImportedText,
-                    NormalizeToAscii: _settings.NormalizeImportedTextToAscii),
+                CreateImportOptions(minParagraphCharacters: 80, maxParagraphCharacters: 900),
                 progress,
                 _importCancellation.Token);
 
-            ImportStatus = $"Imported {result.ParagraphsImported} paragraphs.";
+            ImportStatus = !_settings.AllowPunctuation
+                ? $"Imported {result.ParagraphsImported} paragraphs with punctuation removed."
+                : $"Imported {result.ParagraphsImported} paragraphs.";
             await RefreshContentPacksAsync(cancellationToken);
         }
         catch (OperationCanceledException)
@@ -645,6 +729,77 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(NormalizeImportedTextToAscii));
         OnPropertyChanged(nameof(LowercaseImportedText));
         OnPropertyChanged(nameof(NormalizeImportedWhitespace));
+    }
+
+    private TextImportOptions CreateImportOptions(int minParagraphCharacters, int maxParagraphCharacters)
+    {
+        return new TextImportOptions(
+            string.IsNullOrWhiteSpace(ImportPackName) ? Path.GetFileNameWithoutExtension(ImportFilePath) : ImportPackName,
+            minParagraphCharacters,
+            maxParagraphCharacters,
+            NormalizeWhitespace: _settings.NormalizeImportedWhitespace,
+            LowercaseWhenImported: _settings.LowercaseImportedText,
+            NormalizeToAscii: _settings.NormalizeImportedTextToAscii,
+            StripPunctuation: !_settings.AllowPunctuation);
+    }
+
+    private void QueueImportPreviewRefresh()
+    {
+        if (_isLoadingSettings || !_hasLoadedSettings)
+        {
+            return;
+        }
+
+        _importPreviewCancellation?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _importPreviewCancellation = cancellation;
+        _ = RefreshImportPreviewAfterDebounceAsync(cancellation);
+    }
+
+    private async Task RefreshImportPreviewAfterDebounceAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(250, cancellation.Token);
+            var preview = await _textFileImportService.PreviewTextFileAsync(
+                ImportFilePath,
+                CreateImportOptions(minParagraphCharacters: 1, maxParagraphCharacters: 1_200),
+                maxCharacters: 1_200,
+                cancellation.Token);
+
+            if (ReferenceEquals(_importPreviewCancellation, cancellation))
+            {
+                ImportOriginalPreviewText = preview.OriginalSample;
+                ImportCleanedPreviewText = preview.CleanedSample;
+                ImportPreviewNotes = preview.CleanupNotes;
+                ImportPreviewStatus = preview.CleanupNotes.Count == 0
+                    ? "Preview ready."
+                    : string.Join(" | ", preview.CleanupNotes);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer path or cleanup setting replaced this preview request.
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(_importPreviewCancellation, cancellation))
+            {
+                ImportOriginalPreviewText = string.Empty;
+                ImportCleanedPreviewText = string.Empty;
+                ImportPreviewNotes = ["Preview unavailable"];
+                ImportPreviewStatus = $"Preview unavailable: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_importPreviewCancellation, cancellation))
+            {
+                _importPreviewCancellation = null;
+            }
+
+            cancellation.Dispose();
+        }
     }
 
     private static AppSettings ApplyDifficultyPreset(AppSettings settings)
