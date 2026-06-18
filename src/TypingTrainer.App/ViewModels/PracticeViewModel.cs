@@ -828,9 +828,14 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         _lastEscapeTimestampTicks = null;
         var result = _session.ProcessCharacter(character, Stopwatch.GetTimestamp());
         CurrentState = result.State;
-        RecordSessionNetWpmSample(result.State);
-        TypingFeedback = result.WasRejected
-            ? result.FeedbackMessage ?? "Wrong key. Try again."
+        if (result.Event is not null)
+        {
+            RecordSessionNetWpmSample(result.State);
+        }
+
+        var shouldShowMistakeFeedback = result.WasRejected || (result.WasAccepted && !result.WasCorrect);
+        TypingFeedback = shouldShowMistakeFeedback
+            ? result.FeedbackMessage ?? "Wrong key."
             : string.Empty;
 
         if (result.State.IsComplete && !_completionQueued)
@@ -844,9 +849,9 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
             _ = CompleteAndQueueSessionAsync(completedSession, completedGeneration, completedMode);
         }
 
-        return result.WasRejected
+        return shouldShowMistakeFeedback
             ? PracticeInputFeedback.Mistake
-            : PracticeInputFeedback.Key;
+            : result.WasAccepted ? PracticeInputFeedback.Key : PracticeInputFeedback.None;
     }
 
     public PracticeInputFeedback HandleBackspace()
@@ -865,9 +870,14 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         }
 
         TypingFeedback = result.WasAccepted ? string.Empty : result.FeedbackMessage ?? string.Empty;
-        return result.WasAccepted
-            ? PracticeInputFeedback.Key
-            : PracticeInputFeedback.None;
+        if (!result.WasAccepted)
+        {
+            return PracticeInputFeedback.None;
+        }
+
+        return result.Event?.WasCorrection == true
+            ? PracticeInputFeedback.Correction
+            : PracticeInputFeedback.Key;
     }
 
     public void HandleEscape(long timestampTicks)
@@ -1755,5 +1765,6 @@ public enum PracticeInputFeedback
     None,
     Key,
     Mistake,
+    Correction,
     CountdownStarted
 }

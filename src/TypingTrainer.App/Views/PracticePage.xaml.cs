@@ -537,6 +537,10 @@ public sealed partial class PracticePage : Page
             {
                 ElementSoundPlayer.Play(ElementSoundKind.Focus);
             }
+            else if (feedback == PracticeInputFeedback.Correction && ViewModel.KeySoundEnabled)
+            {
+                ElementSoundPlayer.Play(ElementSoundKind.MovePrevious);
+            }
             else if (feedback == PracticeInputFeedback.Key && ViewModel.KeySoundEnabled)
             {
                 ElementSoundPlayer.Play(ElementSoundKind.Invoke);

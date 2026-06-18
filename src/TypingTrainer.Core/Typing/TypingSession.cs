@@ -16,6 +16,7 @@ public sealed class TypingSession
     private int _correctCharacterKeypresses;
     private int _incorrectCharacterKeypresses;
     private int _backspaceCount;
+    private int? _unresolvedStrictMistakePosition;
 
     public TypingSession(string targetText, TypingSessionOptions? options = null)
     {
@@ -37,7 +38,7 @@ public sealed class TypingSession
 
     public int CursorIndex { get; private set; }
 
-    public bool IsComplete => CursorIndex >= TargetText.Length;
+    public bool IsComplete => CursorIndex >= TargetText.Length && _unresolvedStrictMistakePosition is null;
 
     public IReadOnlyList<TypingInputEvent> Events => GetEvents();
 
@@ -84,7 +85,7 @@ public sealed class TypingSession
             elapsedMs,
             MetricsCalculator.CalculateRawWpm(_typedCharacterKeypresses, elapsedMs),
             MetricsCalculator.CalculateAccuracy(_correctCharacterKeypresses, _typedCharacterKeypresses),
-            IsComplete ? null : TargetText[CursorIndex]);
+            CursorIndex < TargetText.Length ? TargetText[CursorIndex] : null);
     }
 
     public KeyProcessResult ProcessCharacter(char typedChar, long timestampTicks)
@@ -97,6 +98,11 @@ public sealed class TypingSession
         if (IsComplete)
         {
             return Ignored(timestampTicks, "The lesson is already complete.");
+        }
+
+        if (_unresolvedStrictMistakePosition is not null)
+        {
+            return BlockedByStrictMistake(timestampTicks);
         }
 
         _startedTimestampTicks ??= timestampTicks;
@@ -114,9 +120,9 @@ public sealed class TypingSession
             _positions[position] = new TypedPosition(
                 typedChar,
                 isCorrect,
-                CountsAsError: !isCorrect || hadRejectedInput,
+                CountsAsError: !isCorrect,
                 HadRejectedInput: hadRejectedInput,
-                IsPendingRejectedInput: false);
+                IsUnresolvedStrictMistake: false);
             CursorIndex++;
         }
         else
@@ -126,7 +132,10 @@ public sealed class TypingSession
                 IsCorrect: false,
                 CountsAsError: true,
                 HadRejectedInput: true,
-                IsPendingRejectedInput: true);
+                IsUnresolvedStrictMistake: true);
+            CursorIndex++;
+            _unresolvedStrictMistakePosition = position;
+            shouldAdvance = true;
         }
 
         _typedCharacterKeypresses++;
@@ -156,11 +165,11 @@ public sealed class TypingSession
             GetSnapshot(timestampTicks),
             inputEvent,
             WasAccepted: shouldAdvance,
-            Message: shouldAdvance ? null : "Wrong key. Try again.",
+            Message: isCorrect ? null : GetWrongKeyMessage(),
             DidAdvance: shouldAdvance,
             WasCorrect: isCorrect,
-            WasRejected: !shouldAdvance,
-            FeedbackMessage: shouldAdvance ? null : "Wrong key. Try again.");
+            WasRejected: false,
+            FeedbackMessage: isCorrect ? null : GetWrongKeyMessage());
     }
 
     public KeyProcessResult ProcessBackspace(long timestampTicks)
@@ -170,9 +179,9 @@ public sealed class TypingSession
             return Ignored(timestampTicks, "Backspace is disabled for this session.");
         }
 
-        if (!IsComplete && _positions[CursorIndex].IsPendingRejectedInput)
+        if (_unresolvedStrictMistakePosition is int strictMistakePosition)
         {
-            return ClearPendingRejectedInput(timestampTicks);
+            return ClearUnresolvedStrictMistake(strictMistakePosition, timestampTicks);
         }
 
         if (CursorIndex <= 0)
@@ -238,13 +247,14 @@ public sealed class TypingSession
         return position == CursorIndex && !IsComplete ? CharacterState.Current : CharacterState.Pending;
     }
 
-    private KeyProcessResult ClearPendingRejectedInput(long timestampTicks)
+    private KeyProcessResult ClearUnresolvedStrictMistake(int removedPosition, long timestampTicks)
     {
-        var removedPosition = CursorIndex;
         var removed = _positions[removedPosition];
 
         _positions[removedPosition] = TypedPosition.ClearedRejectedInput;
         _positionWasCleared[removedPosition] = true;
+        CursorIndex = removedPosition;
+        _unresolvedStrictMistakePosition = null;
         _backspaceCount++;
 
         var inputEvent = CreateEvent(
@@ -267,6 +277,21 @@ public sealed class TypingSession
             WasCorrect: true);
     }
 
+    private KeyProcessResult BlockedByStrictMistake(long timestampTicks)
+    {
+        const string message = "Press Backspace to fix the red letter.";
+
+        return new KeyProcessResult(
+            GetSnapshot(timestampTicks),
+            Event: null,
+            WasAccepted: false,
+            Message: message,
+            DidAdvance: false,
+            WasCorrect: false,
+            WasRejected: true,
+            FeedbackMessage: message);
+    }
+
     private KeyProcessResult Ignored(long timestampTicks, string message)
     {
         return new KeyProcessResult(
@@ -275,6 +300,13 @@ public sealed class TypingSession
             WasAccepted: false,
             Message: message,
             FeedbackMessage: message);
+    }
+
+    private string GetWrongKeyMessage()
+    {
+        return _options.ErrorAdvanceMode == ErrorAdvanceMode.RequireCorrectKey
+            ? "Press Backspace to fix the red letter."
+            : "Wrong key.";
     }
 
     private TypingInputEvent CreateEvent(
@@ -316,13 +348,13 @@ public sealed class TypingSession
         bool IsCorrect,
         bool CountsAsError,
         bool HadRejectedInput,
-        bool IsPendingRejectedInput)
+        bool IsUnresolvedStrictMistake)
     {
         public static TypedPosition ClearedRejectedInput { get; } = new(
             ActualChar: null,
             IsCorrect: false,
             CountsAsError: false,
             HadRejectedInput: true,
-            IsPendingRejectedInput: false);
+            IsUnresolvedStrictMistake: false);
     }
 }

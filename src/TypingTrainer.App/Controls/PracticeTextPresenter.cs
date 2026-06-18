@@ -40,10 +40,10 @@ public sealed class PracticeTextPresenter : UserControl
         typeof(PracticeTextPresenter),
         new PropertyMetadata("Underline", OnStateChanged));
 
-    private static readonly SolidColorBrush CorrectBrush = new(Color.FromArgb(255, 32, 145, 108));
+    private static readonly SolidColorBrush CorrectBrush = new(Color.FromArgb(255, 132, 136, 140));
+    private static readonly SolidColorBrush LatestCorrectBrush = new(Color.FromArgb(255, 32, 145, 108));
     private static readonly SolidColorBrush IncorrectBrush = new(Color.FromArgb(255, 196, 43, 55));
-    private static readonly SolidColorBrush CurrentBrush = new(Color.FromArgb(255, 0, 95, 184));
-    private static readonly SolidColorBrush PendingBrush = new(Color.FromArgb(255, 88, 92, 95));
+    private static readonly SolidColorBrush FallbackTargetBrush = new(Color.FromArgb(255, 18, 18, 18));
 
     private readonly TextBlock _textBlock = new()
     {
@@ -159,13 +159,14 @@ public sealed class PracticeTextPresenter : UserControl
         }
 
         var textBuilder = new StringBuilder();
-        CharacterState? activeState = null;
+        VisualCharacterState? activeState = null;
+        var latestCorrectPosition = GetLatestCorrectPosition(State);
 
         foreach (var character in State.Characters)
         {
-            var visualState = GetVisualState(character);
+            var visualState = GetVisualState(character, latestCorrectPosition);
 
-            if (visualState == CharacterState.Current)
+            if (visualState == VisualCharacterState.Current)
             {
                 FlushRun(textBuilder, activeState);
                 activeState = null;
@@ -185,7 +186,7 @@ public sealed class PracticeTextPresenter : UserControl
         FlushRun(textBuilder, activeState);
     }
 
-    private void FlushRun(StringBuilder textBuilder, CharacterState? state)
+    private void FlushRun(StringBuilder textBuilder, VisualCharacterState? state)
     {
         if (state is null || textBuilder.Length == 0)
         {
@@ -208,7 +209,7 @@ public sealed class PracticeTextPresenter : UserControl
             _textBlock.Inlines.Add(new Run
             {
                 Text = expectedChar.ToString(),
-                Foreground = CurrentBrush,
+                Foreground = GetBrush(VisualCharacterState.Current),
                 FontWeight = Microsoft.UI.Text.FontWeights.Bold
             });
             return;
@@ -216,7 +217,7 @@ public sealed class PracticeTextPresenter : UserControl
 
         var underline = new Underline
         {
-            Foreground = CurrentBrush
+            Foreground = GetBrush(VisualCharacterState.Current)
         };
 
         underline.Inlines.Add(new Run { Text = expectedChar.ToString() });
@@ -225,29 +226,57 @@ public sealed class PracticeTextPresenter : UserControl
 
     private static char GetDisplayChar(CharacterSnapshot character)
     {
-        return character.ActualChar ?? character.ExpectedChar;
+        return character.ExpectedChar;
     }
 
-    private static CharacterState GetVisualState(CharacterSnapshot character)
+    private static VisualCharacterState GetVisualState(CharacterSnapshot character, int? latestCorrectPosition)
     {
-        if (character.State == CharacterState.Correct && character.HadRejectedInput)
+        return character.State switch
         {
-            return CharacterState.Incorrect;
-        }
-
-        return character.State;
+            CharacterState.Correct when latestCorrectPosition == character.Position => VisualCharacterState.LatestCorrect,
+            CharacterState.Correct => VisualCharacterState.Correct,
+            CharacterState.Incorrect => VisualCharacterState.Incorrect,
+            CharacterState.Current => VisualCharacterState.Current,
+            _ => VisualCharacterState.Pending
+        };
     }
 
-    private Brush GetBrush(CharacterState state)
+    private static int? GetLatestCorrectPosition(TypingStateSnapshot state)
+    {
+        var latestPosition = Math.Min(state.CursorIndex - 1, state.Characters.Count - 1);
+        return latestPosition >= 0 && state.Characters[latestPosition].State == CharacterState.Correct
+            ? latestPosition
+            : null;
+    }
+
+    private Brush GetBrush(VisualCharacterState state)
     {
         return state switch
         {
-            CharacterState.Correct => CorrectBrush,
-            CharacterState.Incorrect => IncorrectBrush,
-            CharacterState.Current => CurrentBrush,
-            _ => string.Equals(TextContrast, "High", StringComparison.OrdinalIgnoreCase)
-                ? new SolidColorBrush(Color.FromArgb(255, 128, 132, 136))
-                : PendingBrush
+            VisualCharacterState.LatestCorrect => LatestCorrectBrush,
+            VisualCharacterState.Correct => CorrectBrush,
+            VisualCharacterState.Incorrect => IncorrectBrush,
+            _ => GetTargetBrush()
         };
+    }
+
+    private static Brush GetTargetBrush()
+    {
+        if (Application.Current?.Resources.TryGetValue("TextFillColorPrimaryBrush", out var brush) == true
+            && brush is Brush targetBrush)
+        {
+            return targetBrush;
+        }
+
+        return FallbackTargetBrush;
+    }
+
+    private enum VisualCharacterState
+    {
+        Pending,
+        Current,
+        Correct,
+        LatestCorrect,
+        Incorrect
     }
 }
