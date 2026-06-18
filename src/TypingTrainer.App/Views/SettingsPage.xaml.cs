@@ -10,6 +10,17 @@ namespace TypingTrainer.App.Views;
 
 public sealed partial class SettingsPage : Page
 {
+    private static readonly string[] ThemePresets =
+    {
+        AppSettings.SystemThemePreset,
+        AppSettings.DarkThemePreset,
+        AppSettings.LightThemePreset,
+        AppSettings.InkThemePreset,
+        AppSettings.ForestThemePreset,
+        AppSettings.DawnThemePreset,
+        AppSettings.HighContrastThemePreset
+    };
+
     private bool _isLoaded;
 
     public SettingsPage()
@@ -50,12 +61,8 @@ public sealed partial class SettingsPage : Page
             "Punctuation" => 5,
             _ => 0
         };
-        ThemePresetComboBox.SelectedIndex = ViewModel.ThemePreset switch
-        {
-            "Dark" => 1,
-            "Light" => 2,
-            _ => 0
-        };
+        var themePresetIndex = Array.IndexOf(ThemePresets, ViewModel.ThemePreset);
+        ThemePresetComboBox.SelectedIndex = themePresetIndex >= 0 ? themePresetIndex : 0;
         DifficultyPresetComboBox.SelectedIndex = ViewModel.DifficultyPreset switch
         {
             "Speed Words" => 1,
@@ -111,12 +118,9 @@ public sealed partial class SettingsPage : Page
             return;
         }
 
-        ViewModel.ThemePreset = ThemePresetComboBox.SelectedIndex switch
-        {
-            1 => "Dark",
-            2 => "Light",
-            _ => "System"
-        };
+        ViewModel.ThemePreset = ThemePresetComboBox.SelectedIndex >= 0 && ThemePresetComboBox.SelectedIndex < ThemePresets.Length
+            ? ThemePresets[ThemePresetComboBox.SelectedIndex]
+            : AppSettings.DefaultThemePreset;
         AppThemeService.Apply(ViewModel.ThemePreset);
     }
 

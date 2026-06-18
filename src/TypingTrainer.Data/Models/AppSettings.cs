@@ -44,7 +44,14 @@ public sealed record AppSettings(
     public const string DefaultLineWidth = "Comfortable";
     public const string DefaultTextContrast = "Normal";
     public const string DefaultCursorStyle = "Underline";
-    public const string DefaultThemePreset = "System";
+    public const string SystemThemePreset = "System";
+    public const string DarkThemePreset = "Dark";
+    public const string LightThemePreset = "Light";
+    public const string InkThemePreset = "Ink";
+    public const string ForestThemePreset = "Forest";
+    public const string DawnThemePreset = "Dawn";
+    public const string HighContrastThemePreset = "High Contrast";
+    public const string DefaultThemePreset = SystemThemePreset;
     public const string DefaultDifficultyPreset = "Custom";
 
     public static AppSettings Defaults { get; } = new(

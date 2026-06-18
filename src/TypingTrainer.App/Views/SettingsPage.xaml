@@ -220,11 +220,15 @@
                                 <TextBlock Text="Theme" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <ComboBox
                                     x:Name="ThemePresetComboBox"
-                                    Width="160"
+                                    Width="180"
                                     SelectionChanged="ThemePresetComboBox_SelectionChanged">
                                     <ComboBoxItem Content="System" />
                                     <ComboBoxItem Content="Dark" />
                                     <ComboBoxItem Content="Light" />
+                                    <ComboBoxItem Content="Ink" />
+                                    <ComboBoxItem Content="Forest" />
+                                    <ComboBoxItem Content="Dawn" />
+                                    <ComboBoxItem Content="High Contrast" />
                                 </ComboBox>
                             </StackPanel>
                         </StackPanel>
