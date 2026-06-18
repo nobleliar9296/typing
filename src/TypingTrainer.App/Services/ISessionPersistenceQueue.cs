@@ -7,11 +7,11 @@ public interface ISessionPersistenceQueue
 {
     Exception? LastError { get; }
 
-    ValueTask EnqueueCompletedSessionAsync(
+    ValueTask<SessionPersistenceResult> EnqueueCompletedSessionAsync(
         SessionSummary summary,
         IReadOnlyList<TypingInputEvent> events,
         string mode = "fixed",
         CancellationToken cancellationToken = default);
 
-    Task FlushAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SessionPersistenceResult>> FlushAsync(CancellationToken cancellationToken = default);
 }

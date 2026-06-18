@@ -101,7 +101,7 @@
                                 <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Spacing="4">
                                     <CheckBox Content="Require correct key to advance" IsChecked="{Binding RequireCorrectKeyToAdvance, Mode=TwoWay}" />
                                     <TextBlock
-                                        Text="Wrong keys count as mistakes, but the cursor stays put until the expected key is typed."
+                                        Text="In strict mode, an incorrect key is marked in red and the cursor advances. Press Backspace to correct the mistake before continuing."
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                         TextWrapping="Wrap" />
                                 </StackPanel>
@@ -204,7 +204,17 @@
                                 </StackPanel>
 
                                 <TextBlock Grid.Row="4" Text="Font" VerticalAlignment="Center" />
-                                <TextBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding PracticeFontFamily, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <ComboBox
+                                    x:Name="FontFamilyComboBox"
+                                    Grid.Row="4"
+                                    Grid.Column="1"
+                                    Grid.ColumnSpan="3"
+                                    SelectionChanged="FontFamilyComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="Cascadia Mono" />
+                                    <ComboBoxItem Content="Consolas" />
+                                    <ComboBoxItem Content="Courier New" />
+                                    <ComboBoxItem Content="Lucida Console" />
+                                </ComboBox>
 
                                 <TextBlock Grid.Row="5" Text="Line width" VerticalAlignment="Center" />
                                 <TextBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding PracticeLineWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />

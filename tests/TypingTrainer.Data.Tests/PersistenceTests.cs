@@ -25,7 +25,7 @@ public sealed class PersistenceTests
     }
 
     [TestMethod]
-    public async Task DatabaseInitializer_RecordsSchemaVersionThree()
+    public async Task DatabaseInitializer_RecordsSchemaVersionFour()
     {
         await using var database = await TestDatabase.CreateInitializedAsync();
 
@@ -35,7 +35,26 @@ public sealed class PersistenceTests
 
         var version = Convert.ToInt32(await command.ExecuteScalarAsync());
 
-        Assert.AreEqual(3, version);
+        Assert.AreEqual(4, version);
+    }
+
+    [TestMethod]
+    public async Task DatabaseInitializer_CreatesModeStartedIndex()
+    {
+        await using var database = await TestDatabase.CreateInitializedAsync();
+
+        await using var connection = await database.ConnectionFactory.OpenConnectionAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'index'
+              AND name = 'idx_practice_sessions_mode_started';
+            """;
+
+        var indexCount = Convert.ToInt32(await command.ExecuteScalarAsync());
+
+        Assert.AreEqual(1, indexCount);
     }
 
     [TestMethod]

@@ -370,7 +370,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public double VisualKeyboardScale => _settings.VisualKeyboardScalePercent / 100.0;
 
-    public string PracticeFontFamily => _settings.PracticeFontFamily;
+    public string PracticeFontFamily => AppSettings.NormalizePracticeFontFamily(_settings.PracticeFontFamily);
 
     public string PracticeTextContrast => _settings.PracticeTextContrast;
 
@@ -538,10 +538,33 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         }
     }
 
-    public void StartNewLesson()
+    public async Task StartNewLessonAsync(CancellationToken cancellationToken = default)
     {
-        _settings = _lessonService.GetSettingsAsync().GetAwaiter().GetResult();
-        StartSession(_currentLesson, _activeLessonMode);
+        if (IsGeneratingLesson)
+        {
+            return;
+        }
+
+        try
+        {
+            IsGeneratingLesson = true;
+            CompletionStatus = "Restarting lesson...";
+            _settings = await _lessonService.GetSettingsAsync(cancellationToken);
+            StartSession(_currentLesson, _activeLessonMode);
+        }
+        catch (OperationCanceledException)
+        {
+            CompletionStatus = "Restart canceled.";
+        }
+        catch (Exception ex)
+        {
+            StartupExceptionLogger.Log("PracticeViewModel.StartNewLesson", ex);
+            CompletionStatus = "Lesson could not restart.";
+        }
+        finally
+        {
+            IsGeneratingLesson = false;
+        }
     }
 
     public void DismissReviewPopup()
@@ -941,21 +964,47 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
             if (_settings.AutoSaveCompletedSessions)
             {
-                await _sessionPersistenceQueue.EnqueueCompletedSessionAsync(
+                var saveResult = await _sessionPersistenceQueue.EnqueueCompletedSessionAsync(
                     summary,
                     events,
                     completedMode.ToString());
 
-                SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Updating learning plan...");
-                await _sessionPersistenceQueue.FlushAsync();
-                var profile = await _lessonService.GetSkillProfileAsync();
-                if (IsCurrentCompletion(completedGeneration))
+                switch (saveResult.Status)
                 {
-                    _completedLearningTargets = profile.DueLearningTargets.Take(6).ToArray();
-                    OnReviewChanged();
-                }
+                    case SessionPersistenceStatus.Saved:
+                        SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Updating learning plan...");
+                        try
+                        {
+                            var profile = await _lessonService.GetSkillProfileAsync();
+                            if (IsCurrentCompletion(completedGeneration))
+                            {
+                                _completedLearningTargets = profile.DueLearningTargets.Take(6).ToArray();
+                                OnReviewChanged();
+                            }
 
-                SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Saved locally.");
+                            SetCompletionStatusIfCurrent(completedGeneration, SessionPersistenceStatusText.Saved);
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            StartupExceptionLogger.Log("PracticeViewModel.RefreshLearningTargets", ex);
+                            SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Saved locally, but learning targets could not refresh.");
+                        }
+
+                        break;
+                    case SessionPersistenceStatus.SavedWithLearningUpdateFailure:
+                        _completedLearningTargets = Array.Empty<LearningTarget>();
+                        SetCompletionStatusIfCurrent(completedGeneration, SessionPersistenceStatusText.FromResult(saveResult));
+                        break;
+                    case SessionPersistenceStatus.Canceled:
+                        _completedLearningTargets = Array.Empty<LearningTarget>();
+                        SetCompletionStatusIfCurrent(completedGeneration, SessionPersistenceStatusText.FromResult(saveResult));
+                        break;
+                    case SessionPersistenceStatus.Failed:
+                    default:
+                        _completedLearningTargets = Array.Empty<LearningTarget>();
+                        SetCompletionStatusIfCurrent(completedGeneration, SessionPersistenceStatusText.FromResult(saveResult));
+                        break;
+                }
             }
             else
             {
@@ -963,9 +1012,14 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
                 SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Auto-save is off.");
             }
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            StartupExceptionLogger.Log("PracticeViewModel.CompleteAndQueueSession", ex);
             SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Local save could not be queued.");
+        }
+        catch (OperationCanceledException)
+        {
+            SetCompletionStatusIfCurrent(completedGeneration, "Session complete. Local save was canceled.");
         }
     }
 

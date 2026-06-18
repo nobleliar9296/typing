@@ -57,7 +57,7 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             GetString(values, "goals.trainingFocus", defaults.GoalTrainingFocus),
             GetClampedInt(values, "goals.targetSessionMinutes", defaults.GoalTargetSessionMinutes, 5, 60),
             GetClampedInt(values, "goals.targetEssayWords", defaults.GoalTargetEssayWords, 100, 3000),
-            GetString(values, "practice.fontFamily", defaults.PracticeFontFamily),
+            AppSettings.NormalizePracticeFontFamily(GetString(values, "practice.fontFamily", defaults.PracticeFontFamily)),
             GetString(values, "practice.lineWidth", defaults.PracticeLineWidth),
             GetString(values, "practice.textContrast", defaults.PracticeTextContrast),
             AppSettings.NormalizeCursorStyle(GetString(values, "practice.cursorStyle", defaults.PracticeCursorStyle)),
@@ -99,7 +99,7 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.trainingFocus", settings.GoalTrainingFocus, cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetSessionMinutes", settings.GoalTargetSessionMinutes.ToString(), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "goals.targetEssayWords", settings.GoalTargetEssayWords.ToString(), cancellationToken).ConfigureAwait(false);
-        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.fontFamily", settings.PracticeFontFamily, cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.fontFamily", AppSettings.NormalizePracticeFontFamily(settings.PracticeFontFamily), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.lineWidth", settings.PracticeLineWidth, cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.textContrast", settings.PracticeTextContrast, cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.cursorStyle", AppSettings.NormalizeCursorStyle(settings.PracticeCursorStyle), cancellationToken).ConfigureAwait(false);

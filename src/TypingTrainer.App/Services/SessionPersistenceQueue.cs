@@ -12,14 +12,17 @@ public sealed class SessionPersistenceQueue : ISessionPersistenceQueue
     private readonly IPracticeSessionRepository _practiceSessionRepository;
     private readonly ILearningProgressRepository _learningProgressRepository;
     private readonly Channel<PendingSession> _channel;
-    private readonly ConcurrentDictionary<Guid, Task> _pendingTasks = new();
+    private readonly ConcurrentDictionary<Guid, Task<SessionPersistenceResult>> _pendingTasks = new();
+    private readonly Action<string, Exception> _logException;
 
     public SessionPersistenceQueue(
         IPracticeSessionRepository practiceSessionRepository,
-        ILearningProgressRepository learningProgressRepository)
+        ILearningProgressRepository learningProgressRepository,
+        Action<string, Exception>? logException = null)
     {
         _practiceSessionRepository = practiceSessionRepository;
         _learningProgressRepository = learningProgressRepository;
+        _logException = logException ?? StartupExceptionLogger.Log;
         _channel = Channel.CreateUnbounded<PendingSession>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -31,7 +34,7 @@ public sealed class SessionPersistenceQueue : ISessionPersistenceQueue
 
     public Exception? LastError { get; private set; }
 
-    public async ValueTask EnqueueCompletedSessionAsync(
+    public async ValueTask<SessionPersistenceResult> EnqueueCompletedSessionAsync(
         SessionSummary summary,
         IReadOnlyList<TypingInputEvent> events,
         string mode = "fixed",
@@ -44,15 +47,24 @@ public sealed class SessionPersistenceQueue : ISessionPersistenceQueue
         {
             await _channel.Writer.WriteAsync(pendingSession, cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException ex)
+        {
+            _pendingTasks.TryRemove(pendingSession.Id, out _);
+            return pendingSession.Cancel(ex);
+        }
         catch
         {
             _pendingTasks.TryRemove(pendingSession.Id, out _);
             throw;
         }
+
+        return await pendingSession.Completion.Task.ConfigureAwait(false);
     }
 
-    public async Task FlushAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SessionPersistenceResult>> FlushAsync(CancellationToken cancellationToken = default)
     {
+        var results = new List<SessionPersistenceResult>();
+
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -60,10 +72,10 @@ public sealed class SessionPersistenceQueue : ISessionPersistenceQueue
 
             if (pending.Length == 0)
             {
-                return;
+                return results;
             }
 
-            await Task.WhenAll(pending).WaitAsync(cancellationToken).ConfigureAwait(false);
+            results.AddRange(await Task.WhenAll(pending).WaitAsync(cancellationToken).ConfigureAwait(false));
         }
     }
 
@@ -79,16 +91,38 @@ public sealed class SessionPersistenceQueue : ISessionPersistenceQueue
                 await _practiceSessionRepository
                     .SaveCompletedSessionAsync(storedSession, storedEvents)
                     .ConfigureAwait(false);
-                await _learningProgressRepository
-                    .UpdateFromCompletedSessionAsync(storedSession, storedEvents)
-                    .ConfigureAwait(false);
 
-                pendingSession.Completion.TrySetResult();
+                try
+                {
+                    await _learningProgressRepository
+                        .UpdateFromCompletedSessionAsync(storedSession, storedEvents)
+                        .ConfigureAwait(false);
+
+                    pendingSession.Complete(SessionPersistenceStatus.Saved);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    LastError = ex;
+                    _logException("SessionPersistenceQueue.LearningProgress", ex);
+                    pendingSession.Complete(SessionPersistenceStatus.SavedWithLearningUpdateFailure, ex);
+                }
+                catch (OperationCanceledException ex)
+                {
+                    LastError = ex;
+                    _logException("SessionPersistenceQueue.LearningProgressCanceled", ex);
+                    pendingSession.Complete(SessionPersistenceStatus.SavedWithLearningUpdateFailure, ex);
+                }
+            }
+            catch (OperationCanceledException ex)
+            {
+                LastError = ex;
+                pendingSession.Cancel(ex);
             }
             catch (Exception ex)
             {
                 LastError = ex;
-                pendingSession.Completion.TrySetResult();
+                _logException("SessionPersistenceQueue.SaveCompletedSession", ex);
+                pendingSession.Complete(SessionPersistenceStatus.Failed, ex);
             }
             finally
             {
@@ -174,7 +208,7 @@ public sealed class SessionPersistenceQueue : ISessionPersistenceQueue
             Summary = summary;
             Events = events;
             Mode = mode;
-            Completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Completion = new TaskCompletionSource<SessionPersistenceResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
         public Guid Id { get; }
@@ -185,6 +219,18 @@ public sealed class SessionPersistenceQueue : ISessionPersistenceQueue
 
         public string Mode { get; }
 
-        public TaskCompletionSource Completion { get; }
+        public TaskCompletionSource<SessionPersistenceResult> Completion { get; }
+
+        public void Complete(SessionPersistenceStatus status, Exception? error = null)
+        {
+            Completion.TrySetResult(new SessionPersistenceResult(status, Summary.SessionId, error));
+        }
+
+        public SessionPersistenceResult Cancel(OperationCanceledException error)
+        {
+            var result = new SessionPersistenceResult(SessionPersistenceStatus.Canceled, Summary.SessionId, error);
+            Completion.TrySetResult(result);
+            return result;
+        }
     }
 }

@@ -75,6 +75,7 @@ public sealed class PracticeTextPresenter : UserControl
     private Storyboard? _cursorStoryboard;
     private bool _hasCursorPosition;
     private Windows.Foundation.Rect? _lastCursorBounds;
+    private PracticeTextLayoutSnapshot? _layoutSnapshot;
 
     public PracticeTextPresenter()
     {
@@ -142,12 +143,14 @@ public sealed class PracticeTextPresenter : UserControl
     private void ApplyDisplayScale()
     {
         var scale = Math.Clamp(DisplayScale, 0.5, 1.3);
-        _textBlock.FontFamily = new FontFamily(string.IsNullOrWhiteSpace(FontFamilyName) ? "Cascadia Mono, Consolas" : $"{FontFamilyName}, Consolas");
+        var fontFamily = AppSettings.NormalizePracticeFontFamily(FontFamilyName);
+        _textBlock.FontFamily = new FontFamily($"{fontFamily}, Consolas");
         _textBlock.FontSize = 34 * scale;
         _textBlock.LineHeight = 48 * scale;
         _measureTextBlock.FontFamily = _textBlock.FontFamily;
         _measureTextBlock.FontSize = _textBlock.FontSize;
         _measureTextBlock.LineHeight = _textBlock.LineHeight;
+        _layoutSnapshot = null;
         UpdateCursor(animate: false);
     }
 
@@ -157,6 +160,7 @@ public sealed class PracticeTextPresenter : UserControl
 
         if (State is null)
         {
+            _layoutSnapshot = null;
             _cursor.Visibility = Visibility.Collapsed;
             return;
         }
@@ -164,7 +168,8 @@ public sealed class PracticeTextPresenter : UserControl
         var textBuilder = new StringBuilder();
         VisualCharacterState? activeState = null;
 
-        var layout = BuildCharacterLayout();
+        _layoutSnapshot = BuildLayoutSnapshot();
+        var layout = _layoutSnapshot.Layout;
 
         for (var index = 0; index < State.Characters.Count; index++)
         {
@@ -240,38 +245,38 @@ public sealed class PracticeTextPresenter : UserControl
             return new Windows.Foundation.Rect(0, 0, 0, 0);
         }
 
-        var scale = Math.Clamp(DisplayScale, 0.5, 1.3);
-        var fontSize = _textBlock.FontSize;
-        var lineHeight = 48 * scale;
-        var characterWidth = MeasureCharacterWidth();
+        var snapshot = GetLayoutSnapshot();
         var cursor = Math.Clamp(State.CursorIndex, 0, State.TargetText.Length);
-        var position = GetCursorPosition(cursor);
+        var position = GetCursorPosition(cursor, snapshot);
 
-        return new Windows.Foundation.Rect(position.Column * characterWidth, position.Line * lineHeight, characterWidth, lineHeight);
+        return new Windows.Foundation.Rect(
+            position.Column * snapshot.CharacterWidth,
+            position.Line * snapshot.LineHeight,
+            snapshot.CharacterWidth,
+            snapshot.LineHeight);
     }
 
-    private CharacterLayoutPosition GetCursorPosition(int cursor)
+    private CharacterLayoutPosition GetCursorPosition(int cursor, PracticeTextLayoutSnapshot snapshot)
     {
-        if (State is null || State.Characters.Count == 0)
+        if (State is null || State.Characters.Count == 0 || snapshot.Layout.Length == 0)
         {
             return new CharacterLayoutPosition(0, 0);
         }
 
-        var layout = BuildCharacterLayout();
-        if (cursor < layout.Length)
+        if (cursor < snapshot.Layout.Length)
         {
-            return layout[cursor];
+            return snapshot.Layout[cursor];
         }
 
         var lastCharacter = State.Characters[^1];
-        var lastPosition = layout[^1];
+        var lastPosition = snapshot.Layout[^1];
         if (lastCharacter.ExpectedChar == '\n')
         {
             return new CharacterLayoutPosition(lastPosition.Line + 1, 0);
         }
 
         var nextColumn = lastPosition.Column + 1;
-        if (nextColumn >= GetColumnCapacity())
+        if (nextColumn >= snapshot.ColumnCapacity)
         {
             return new CharacterLayoutPosition(lastPosition.Line + 1, 0);
         }
@@ -279,7 +284,26 @@ public sealed class PracticeTextPresenter : UserControl
         return new CharacterLayoutPosition(lastPosition.Line, nextColumn);
     }
 
-    private CharacterLayoutPosition[] BuildCharacterLayout()
+    private PracticeTextLayoutSnapshot GetLayoutSnapshot()
+    {
+        _layoutSnapshot ??= BuildLayoutSnapshot();
+        return _layoutSnapshot;
+    }
+
+    private PracticeTextLayoutSnapshot BuildLayoutSnapshot()
+    {
+        var scale = Math.Clamp(DisplayScale, 0.5, 1.3);
+        var characterWidth = MeasureCharacterWidth();
+        var lineHeight = 48 * scale;
+        var columnCapacity = GetColumnCapacity(characterWidth);
+        return new PracticeTextLayoutSnapshot(
+            BuildCharacterLayout(columnCapacity),
+            characterWidth,
+            lineHeight,
+            columnCapacity);
+    }
+
+    private CharacterLayoutPosition[] BuildCharacterLayout(int maxColumns)
     {
         if (State is null || State.Characters.Count == 0)
         {
@@ -287,7 +311,6 @@ public sealed class PracticeTextPresenter : UserControl
         }
 
         var layout = new CharacterLayoutPosition[State.Characters.Count];
-        var maxColumns = GetColumnCapacity();
         var line = 0;
         var start = 0;
 
@@ -356,9 +379,8 @@ public sealed class PracticeTextPresenter : UserControl
         return lastSpace > start ? lastSpace + 1 : hardLimit;
     }
 
-    private int GetColumnCapacity()
+    private int GetColumnCapacity(double characterWidth)
     {
-        var characterWidth = MeasureCharacterWidth();
         var availableWidth = GetAvailableTextWidth();
         return Math.Max(1, (int)Math.Floor(availableWidth / Math.Max(characterWidth, 1)));
     }
@@ -562,4 +584,10 @@ public sealed class PracticeTextPresenter : UserControl
     }
 
     private readonly record struct CharacterLayoutPosition(int Line, int Column);
+
+    private sealed record PracticeTextLayoutSnapshot(
+        CharacterLayoutPosition[] Layout,
+        double CharacterWidth,
+        double LineHeight,
+        int ColumnCapacity);
 }

@@ -30,7 +30,10 @@ public sealed partial class SettingsPage : Page
         AppSettings.OutlineCursorStyle
     };
 
+    private static readonly string[] FontFamilies = AppSettings.PracticeFontFamilies.ToArray();
+
     private bool _isLoaded;
+    private readonly SettingsActionExecutor _actionExecutor = new();
 
     public SettingsPage()
     {
@@ -49,7 +52,15 @@ public sealed partial class SettingsPage : Page
 
     private async void SettingsPage_Loaded(object sender, RoutedEventArgs e)
     {
-        await ViewModel.LoadAsync();
+        var loaded = await RunSettingsActionAsync(
+            () => ViewModel.LoadAsync(),
+            "Settings could not be loaded.",
+            "SettingsPage.Load");
+        if (!loaded)
+        {
+            return;
+        }
+
         DefaultLessonModeComboBox.SelectedIndex = ViewModel.DefaultLessonMode switch
         {
             "Fixed" => 1,
@@ -74,6 +85,8 @@ public sealed partial class SettingsPage : Page
         ThemePresetComboBox.SelectedIndex = themePresetIndex >= 0 ? themePresetIndex : 0;
         var cursorStyleIndex = Array.IndexOf(CursorStyles, AppSettings.NormalizeCursorStyle(ViewModel.PracticeCursorStyle));
         CursorStyleComboBox.SelectedIndex = cursorStyleIndex >= 0 ? cursorStyleIndex : 0;
+        var fontFamilyIndex = Array.IndexOf(FontFamilies, AppSettings.NormalizePracticeFontFamily(ViewModel.PracticeFontFamily));
+        FontFamilyComboBox.SelectedIndex = fontFamilyIndex >= 0 ? fontFamilyIndex : 0;
         DifficultyPresetComboBox.SelectedIndex = ViewModel.DifficultyPreset switch
         {
             "Speed Words" => 1,
@@ -147,6 +160,18 @@ public sealed partial class SettingsPage : Page
             : AppSettings.DefaultCursorStyle;
     }
 
+    private void FontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded)
+        {
+            return;
+        }
+
+        ViewModel.PracticeFontFamily = FontFamilyComboBox.SelectedIndex >= 0 && FontFamilyComboBox.SelectedIndex < FontFamilies.Length
+            ? FontFamilies[FontFamilyComboBox.SelectedIndex]
+            : AppSettings.DefaultFontFamily;
+    }
+
     private void DifficultyPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isLoaded)
@@ -165,24 +190,33 @@ public sealed partial class SettingsPage : Page
 
     private async void BrowseImportButton_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new FileOpenPicker();
-        picker.FileTypeFilter.Add(".txt");
+        await RunSettingsActionAsync(
+            async () =>
+            {
+                var picker = new FileOpenPicker();
+                picker.FileTypeFilter.Add(".txt");
 
-        if (App.MainWindowInstance is not null)
-        {
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindowInstance));
-        }
+                if (App.MainWindowInstance is not null)
+                {
+                    InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindowInstance));
+                }
 
-        var file = await picker.PickSingleFileAsync();
-        if (file is not null)
-        {
-            ViewModel.ImportFilePath = file.Path;
-        }
+                var file = await picker.PickSingleFileAsync();
+                if (file is not null)
+                {
+                    ViewModel.ImportFilePath = file.Path;
+                }
+            },
+            "File selection failed. Try again.",
+            "SettingsPage.BrowseImport");
     }
 
     private async void ImportButton_Click(object sender, RoutedEventArgs e)
     {
-        await ViewModel.ImportAsync();
+        await RunImportActionAsync(
+            () => ViewModel.ImportAsync(),
+            "Import failed. Check the selected file and try again.",
+            "SettingsPage.Import");
     }
 
     private void CancelImportButton_Click(object sender, RoutedEventArgs e)
@@ -192,7 +226,10 @@ public sealed partial class SettingsPage : Page
 
     private async void RefreshPacksButton_Click(object sender, RoutedEventArgs e)
     {
-        await ViewModel.RefreshContentPacksAsync();
+        await RunSettingsActionAsync(
+            () => ViewModel.RefreshContentPacksAsync(),
+            "Content packs could not be refreshed.",
+            "SettingsPage.RefreshPacks");
     }
 
     private void ContentPacksListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -205,39 +242,91 @@ public sealed partial class SettingsPage : Page
 
     private async void DeletePackButton_Click(object sender, RoutedEventArgs e)
     {
-        await ViewModel.DeleteSelectedPackAsync();
+        await RunSettingsActionAsync(
+            () => ViewModel.DeleteSelectedPackAsync(),
+            "Content pack could not be deleted.",
+            "SettingsPage.DeletePack");
     }
 
     private async void SavePackButton_Click(object sender, RoutedEventArgs e)
     {
-        await ViewModel.SaveSelectedPackAsync();
+        await RunSettingsActionAsync(
+            () => ViewModel.SaveSelectedPackAsync(),
+            "Content pack could not be saved.",
+            "SettingsPage.SavePack");
     }
 
     private async void PreviewPackButton_Click(object sender, RoutedEventArgs e)
     {
-        await ViewModel.PreviewSelectedPackAsync();
+        await RunSettingsActionAsync(
+            () => ViewModel.PreviewSelectedPackAsync(),
+            "Content pack preview could not be loaded.",
+            "SettingsPage.PreviewPack");
     }
 
     private async void ExportSessionsButton_Click(object sender, RoutedEventArgs e)
     {
-        await ViewModel.ExportSessionsAsync();
+        await RunSettingsActionAsync(
+            () => ViewModel.ExportSessionsAsync(),
+            "Export failed. Check the selected location and try again.",
+            "SettingsPage.ExportSessions");
     }
 
     private async void DeleteHistoryButton_Click(object sender, RoutedEventArgs e)
     {
-        await ViewModel.DeletePracticeHistoryAsync();
+        await RunSettingsActionAsync(
+            () => ViewModel.DeletePracticeHistoryAsync(),
+            "Practice history could not be deleted.",
+            "SettingsPage.DeleteHistory");
     }
 
     private async void BackupDatabaseButton_Click(object sender, RoutedEventArgs e)
     {
-        await App.Services.SessionPersistenceQueue.FlushAsync();
-        await ViewModel.BackupDatabaseAsync();
+        await RunSettingsActionAsync(
+            async () =>
+            {
+                await App.Services.SessionPersistenceQueue.FlushAsync();
+                await ViewModel.BackupDatabaseAsync();
+            },
+            "Backup failed. Check the selected location and try again.",
+            "SettingsPage.BackupDatabase");
     }
 
     private async void RestoreDatabaseButton_Click(object sender, RoutedEventArgs e)
     {
-        await App.Services.SessionPersistenceQueue.FlushAsync();
-        await ViewModel.RestoreDatabaseAsync();
+        await RunSettingsActionAsync(
+            async () =>
+            {
+                await App.Services.SessionPersistenceQueue.FlushAsync();
+                await ViewModel.RestoreDatabaseAsync();
+            },
+            "Restore failed. Check the selected backup and try again.",
+            "SettingsPage.RestoreDatabase");
     }
 
+    private Task<bool> RunSettingsActionAsync(
+        Func<Task> operation,
+        string fallbackFailureStatus,
+        string logSource)
+    {
+        return _actionExecutor.ExecuteAsync(
+            operation,
+            () => ViewModel.SettingsStatus,
+            ViewModel.SetSettingsStatus,
+            fallbackFailureStatus,
+            logSource);
+    }
+
+    private Task<bool> RunImportActionAsync(
+        Func<Task> operation,
+        string fallbackFailureStatus,
+        string logSource)
+    {
+        return _actionExecutor.ExecuteAsync(
+            operation,
+            () => ViewModel.ImportStatus,
+            ViewModel.SetImportStatus,
+            fallbackFailureStatus,
+            logSource);
+    }
 }

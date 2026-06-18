@@ -5,35 +5,37 @@ namespace TypingTrainer.App.Services;
 
 public sealed class KeyboardSoundPlayer : IDisposable
 {
-    private const int DefaultPlayerPoolSize = 24;
-    private const int DefaultMaxPlayerPoolSize = 48;
+    internal const int DefaultInitialPlayerPoolSize = 24;
+    internal const int DefaultMaxPlayerPoolSize = 48;
     private const string SoundPackPath = "Assets/Sounds/Keyboard/unicae_games_keyboard_soundpack_1/Single Keys";
 
-    private readonly List<MediaPlayer> _players;
+    private readonly KeyboardSoundPlayerPool<MediaPlayer> _playerPool;
     private readonly string[] _keySounds;
     private readonly string[] _mistakeSounds;
     private readonly string[] _correctionSounds;
-    private readonly int _maxPlayerPoolSize;
 
-    private int _nextPlayerIndex;
     private int _lastKeySoundIndex = -1;
     private int _lastMistakeSoundIndex = -1;
     private int _lastCorrectionSoundIndex = -1;
     private bool _isDisposed;
 
     public KeyboardSoundPlayer()
-        : this(AppContext.BaseDirectory, DefaultPlayerPoolSize)
+        : this(AppContext.BaseDirectory, DefaultInitialPlayerPoolSize, DefaultMaxPlayerPoolSize)
     {
     }
 
     internal KeyboardSoundPlayer(string baseDirectory, int playerPoolSize)
+        : this(baseDirectory, playerPoolSize, Math.Max(playerPoolSize, DefaultMaxPlayerPoolSize))
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playerPoolSize);
+    }
 
-        _maxPlayerPoolSize = Math.Max(playerPoolSize, DefaultMaxPlayerPoolSize);
-        _players = Enumerable.Range(0, playerPoolSize)
-            .Select(_ => CreatePlayer())
-            .ToList();
+    internal KeyboardSoundPlayer(string baseDirectory, int initialPlayerPoolSize, int maxPlayerPoolSize)
+    {
+        _playerPool = new KeyboardSoundPlayerPool<MediaPlayer>(
+            initialPlayerPoolSize,
+            maxPlayerPoolSize,
+            CreatePlayer,
+            IsBusy);
 
         var soundDirectory = Path.Combine(baseDirectory, Path.Combine(SoundPackPath.Split('/')));
         _keySounds = BuildSoundList(soundDirectory, 1, 28);
@@ -63,11 +65,7 @@ public sealed class KeyboardSoundPlayer : IDisposable
             return;
         }
 
-        foreach (var player in _players)
-        {
-            player.Dispose();
-        }
-
+        _playerPool.Dispose();
         _isDisposed = true;
     }
 
@@ -96,7 +94,7 @@ public sealed class KeyboardSoundPlayer : IDisposable
         var soundIndex = PickSoundIndex(sounds.Length, lastSoundIndex);
         lastSoundIndex = soundIndex;
 
-        var player = NextPlayer();
+        var player = _playerPool.Acquire();
         player.Source = MediaSource.CreateFromUri(new Uri(sounds[soundIndex]));
         player.Volume = Random.Shared.NextDouble() * (maxVolume - minVolume) + minVolume;
         player.PlaybackSession.PlaybackRate = Random.Shared.NextDouble() * 0.06 + 0.97;
@@ -127,32 +125,6 @@ public sealed class KeyboardSoundPlayer : IDisposable
             AutoPlay = false,
             AudioCategory = MediaPlayerAudioCategory.SoundEffects
         };
-    }
-
-    private MediaPlayer NextPlayer()
-    {
-        for (var attempt = 0; attempt < _players.Count; attempt++)
-        {
-            var index = (_nextPlayerIndex + attempt) % _players.Count;
-            var candidate = _players[index];
-            if (!IsBusy(candidate))
-            {
-                _nextPlayerIndex = (index + 1) % _players.Count;
-                return candidate;
-            }
-        }
-
-        if (_players.Count < _maxPlayerPoolSize)
-        {
-            var newPlayer = CreatePlayer();
-            _players.Add(newPlayer);
-            _nextPlayerIndex = 0;
-            return newPlayer;
-        }
-
-        var player = _players[_nextPlayerIndex];
-        _nextPlayerIndex = (_nextPlayerIndex + 1) % _players.Count;
-        return player;
     }
 
     private static bool IsBusy(MediaPlayer player)

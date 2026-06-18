@@ -38,12 +38,11 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
         CancellationToken cancellationToken = default)
     {
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var sessions = await LoadSessionsAsync(connection, cancellationToken).ConfigureAwait(false);
-        var filteredSessions = FilterSessions(sessions, range, modeFilter).ToArray();
-        var sessionIds = filteredSessions.Select(session => session.Id).ToHashSet();
-        var characterEvents = sessionIds.Count == 0
+        var bounds = GetUtcRange(range);
+        var filteredSessions = await LoadSessionsAsync(connection, bounds, modeFilter, cancellationToken).ConfigureAwait(false);
+        var characterEvents = filteredSessions.Count == 0
             ? Array.Empty<AnalyticsKeyEventRow>()
-            : await LoadCharacterEventsAsync(connection, sessionIds, cancellationToken).ConfigureAwait(false);
+            : await LoadCharacterEventsAsync(connection, bounds, modeFilter, cancellationToken).ConfigureAwait(false);
 
         var characterRows = BuildCharacterRows(characterEvents);
         var bigramRows = BuildBigramRows(characterEvents);
@@ -74,32 +73,6 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
                 .ThenByDescending(row => row.ExposureCount)
                 .Take(AnalyticsLimit)
                 .ToArray());
-    }
-
-    private IEnumerable<SessionRow> FilterSessions(
-        IReadOnlyList<SessionRow> sessions,
-        AnalyticsRange range,
-        string? modeFilter)
-    {
-        var filtered = string.IsNullOrWhiteSpace(modeFilter)
-            ? sessions
-            : sessions
-                .Where(session => string.Equals(session.Mode, modeFilter, StringComparison.OrdinalIgnoreCase))
-                .ToArray();
-
-        if (range == AnalyticsRange.AllTime)
-        {
-            return filtered;
-        }
-
-        var days = range == AnalyticsRange.Last7Days ? 7 : 30;
-        var todayLocal = ToLocalDate(_clock.UtcNow, _localTimeZone);
-        var startLocal = todayLocal.AddDays(-(days - 1));
-        return filtered.Where(session =>
-        {
-            var sessionDate = ToLocalDate(session.StartedAtUtc, _localTimeZone);
-            return sessionDate >= startLocal && sessionDate <= todayLocal;
-        });
     }
 
     private static DashboardSummary BuildSummary(IReadOnlyList<SessionRow> sessions)
@@ -221,6 +194,8 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
 
     private static async Task<IReadOnlyList<SessionRow>> LoadSessionsAsync(
         SqliteConnection connection,
+        UtcRange bounds,
+        string? modeFilter,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
@@ -229,8 +204,12 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
                    accuracy, consistency, total_keypresses, correct_keypresses,
                    incorrect_keypresses, corrected_errors, uncorrected_errors,
                    duration_ms
-            FROM practice_sessions;
+            FROM practice_sessions
+            WHERE ($mode IS NULL OR mode COLLATE NOCASE = $mode)
+              AND ($startUtc IS NULL OR started_at_utc >= $startUtc)
+              AND ($endUtc IS NULL OR started_at_utc < $endUtc);
             """;
+        AddFilterParameters(command, bounds, modeFilter);
 
         var sessions = new List<SessionRow>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -259,18 +238,24 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
 
     private static async Task<IReadOnlyList<AnalyticsKeyEventRow>> LoadCharacterEventsAsync(
         SqliteConnection connection,
-        IReadOnlySet<Guid> sessionIds,
+        UtcRange bounds,
+        string? modeFilter,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT session_id, position, expected_char, actual_char, event_kind,
-                   is_correct, was_correction, delta_previous_ms, elapsed_ms, timestamp_ticks
-            FROM key_events
-            WHERE event_kind = 'Character'
-              AND expected_char IS NOT NULL
-            ORDER BY session_id, timestamp_ticks ASC;
+            SELECT event.session_id, event.position, event.expected_char, event.actual_char, event.event_kind,
+                   event.is_correct, event.was_correction, event.delta_previous_ms, event.elapsed_ms, event.timestamp_ticks
+            FROM key_events event
+            INNER JOIN practice_sessions session ON session.id = event.session_id
+            WHERE event.event_kind = 'Character'
+              AND event.expected_char IS NOT NULL
+              AND ($mode IS NULL OR session.mode COLLATE NOCASE = $mode)
+              AND ($startUtc IS NULL OR session.started_at_utc >= $startUtc)
+              AND ($endUtc IS NULL OR session.started_at_utc < $endUtc)
+            ORDER BY event.session_id, event.timestamp_ticks ASC;
             """;
+        AddFilterParameters(command, bounds, modeFilter);
 
         var events = new List<AnalyticsKeyEventRow>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -278,11 +263,6 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             var sessionId = Guid.Parse(reader.GetString(0));
-            if (!sessionIds.Contains(sessionId))
-            {
-                continue;
-            }
-
             events.Add(new AnalyticsKeyEventRow(
                 sessionId,
                 reader.GetInt32(1),
@@ -309,6 +289,33 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timestampUtc, localTimeZone).DateTime);
     }
 
+    private UtcRange GetUtcRange(AnalyticsRange range)
+    {
+        if (range == AnalyticsRange.AllTime)
+        {
+            return new UtcRange(null, null);
+        }
+
+        var days = range == AnalyticsRange.Last7Days ? 7 : 30;
+        var todayLocal = ToLocalDate(_clock.UtcNow, _localTimeZone);
+        var startLocal = todayLocal.AddDays(-(days - 1));
+        var endLocal = todayLocal.AddDays(1);
+        return new UtcRange(ToUtcBoundary(startLocal), ToUtcBoundary(endLocal));
+    }
+
+    private DateTimeOffset ToUtcBoundary(DateOnly localDate)
+    {
+        var localDateTime = DateTime.SpecifyKind(localDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified);
+        return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localDateTime, _localTimeZone));
+    }
+
+    private static void AddFilterParameters(SqliteCommand command, UtcRange bounds, string? modeFilter)
+    {
+        command.Parameters.AddWithValue("$mode", string.IsNullOrWhiteSpace(modeFilter) ? DBNull.Value : modeFilter);
+        command.Parameters.AddWithValue("$startUtc", bounds.StartUtc is null ? DBNull.Value : bounds.StartUtc.Value.ToString("O"));
+        command.Parameters.AddWithValue("$endUtc", bounds.EndUtc is null ? DBNull.Value : bounds.EndUtc.Value.ToString("O"));
+    }
+
     private sealed record SessionRow(
         Guid Id,
         DateTimeOffset StartedAtUtc,
@@ -324,5 +331,7 @@ public sealed class AnalyticsQueryService : IAnalyticsQueryService
         int CorrectedErrors,
         int UncorrectedErrors,
         long DurationMs);
+
+    private sealed record UtcRange(DateTimeOffset? StartUtc, DateTimeOffset? EndUtc);
 
 }

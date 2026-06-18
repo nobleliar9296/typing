@@ -661,6 +661,22 @@ public sealed class ContentServicesTests
     }
 
     [TestMethod]
+    public async Task AppSettingsRepository_SavePracticeFontFamily_MapsUnsupportedFontsToDefault()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+
+        await database.SettingsRepository.SaveSettingsAsync(AppSettings.Defaults with { PracticeFontFamily = "Arial" });
+        var unsupportedSettings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual(AppSettings.DefaultFontFamily, unsupportedSettings.PracticeFontFamily);
+
+        await database.SettingsRepository.SaveSettingsAsync(AppSettings.Defaults with { PracticeFontFamily = "courier new" });
+        var supportedSettings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual(AppSettings.CourierNewFontFamily, supportedSettings.PracticeFontFamily);
+    }
+
+    [TestMethod]
     public async Task LocalDataBackupService_BackupCreatesValidDatabaseCopy()
     {
         await using var database = await ContentTestDatabase.CreateInitializedAsync();

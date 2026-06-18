@@ -175,6 +175,23 @@ public sealed class MigrationRunner
             await insertVersionCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        if (currentVersion < 4)
+        {
+            await ExecuteAsync(connection, transaction, """
+                CREATE INDEX IF NOT EXISTS idx_practice_sessions_mode_started
+                ON practice_sessions(mode COLLATE NOCASE, started_at_utc);
+                """, cancellationToken).ConfigureAwait(false);
+
+            await using var insertVersionCommand = connection.CreateCommand();
+            insertVersionCommand.Transaction = (SqliteTransaction)transaction;
+            insertVersionCommand.CommandText = """
+                INSERT OR IGNORE INTO schema_version (version, applied_at_utc)
+                VALUES (4, $appliedAtUtc);
+                """;
+            insertVersionCommand.Parameters.AddWithValue("$appliedAtUtc", DateTimeOffset.UtcNow.ToString("O"));
+            await insertVersionCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 

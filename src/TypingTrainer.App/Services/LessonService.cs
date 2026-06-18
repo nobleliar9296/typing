@@ -18,18 +18,21 @@ public sealed class LessonService : ILessonService
     private readonly IAppSettingsRepository _appSettingsRepository;
     private readonly IContentQueryService _contentQueryService;
     private readonly ILessonGenerator _adaptiveLessonGenerator;
+    private readonly Action<string, Exception> _logException;
 
     public LessonService(
         ISkillProfileQueryService skillProfileQueryService,
         IAppSettingsRepository appSettingsRepository,
         IContentQueryService contentQueryService,
         ILessonGenerator adaptiveLessonGenerator,
-        ILessonGenerator paragraphLessonGenerator)
+        ILessonGenerator paragraphLessonGenerator,
+        Action<string, Exception>? logException = null)
     {
         _skillProfileQueryService = skillProfileQueryService;
         _appSettingsRepository = appSettingsRepository;
         _contentQueryService = contentQueryService;
         _adaptiveLessonGenerator = adaptiveLessonGenerator;
+        _logException = logException ?? StartupExceptionLogger.Log;
     }
 
     public async Task<LessonMode> GetDefaultLessonModeAsync(CancellationToken cancellationToken = default)
@@ -113,11 +116,14 @@ public sealed class LessonService : ILessonService
                 skillProfile,
                 CreateOptions(mode == LessonMode.Paragraph ? LessonMode.Adaptive : mode, settings, targetCharacters));
         }
-        catch
+        catch (OperationCanceledException)
         {
-            return new FixedLessonGenerator().Generate(
-                SkillProfileDefaults.Empty(),
-                CreateOptions(LessonMode.Fixed, AppSettings.Defaults, FixedLessonGenerator.FixedLessonText.Length));
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logException($"LessonService.GenerateNextLesson({mode})", ex);
+            return CreateFallbackLesson("The lesson could not be generated. A fallback lesson was loaded.");
         }
     }
 
@@ -191,11 +197,14 @@ public sealed class LessonService : ILessonService
                 ContentSource = "Last session review"
             };
         }
-        catch
+        catch (OperationCanceledException)
         {
-            return new FixedLessonGenerator().Generate(
-                SkillProfileDefaults.Empty(),
-                CreateOptions(LessonMode.Fixed, AppSettings.Defaults, FixedLessonGenerator.FixedLessonText.Length));
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logException("LessonService.GenerateReviewLesson", ex);
+            return CreateFallbackLesson("The review lesson could not be generated. A fallback lesson was loaded.");
         }
     }
 
@@ -256,6 +265,20 @@ public sealed class LessonService : ILessonService
             settings.AllowPunctuation,
             settings.GoalTrainingFocus,
             settings.DifficultyPreset);
+    }
+
+    private static LessonGenerationResult CreateFallbackLesson(string reason)
+    {
+        var lesson = new FixedLessonGenerator().Generate(
+            SkillProfileDefaults.Empty(),
+            CreateOptions(LessonMode.Fixed, AppSettings.Defaults, FixedLessonGenerator.FixedLessonText.Length));
+
+        return lesson with
+        {
+            Reason = reason,
+            ContentTitle = "Fallback lesson",
+            ContentSource = "Typing Trainer"
+        };
     }
 
     private static string NormalizePracticeText(

@@ -77,6 +77,35 @@ public sealed class AnalyticsQueryServiceTests
     }
 
     [TestMethod]
+    public async Task AnalyticsQueryService_GetDashboardSnapshot_RangeFilterLimitsKeyEvents()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        var oldSession = CreateSession(startedAtUtc: NowUtc.AddDays(-8), targetText: "z");
+        var currentSession = CreateSession(startedAtUtc: NowUtc.AddDays(-1), targetText: "a");
+
+        await database.SaveAsync(oldSession, [CharacterEvent(oldSession.Id, 0, 'z', 'x', false, 100, 1)]);
+        await database.SaveAsync(currentSession, [CharacterEvent(currentSession.Id, 0, 'a', 'x', false, 100, 1)]);
+
+        var snapshot = await database.Analytics.GetDashboardSnapshotAsync(AnalyticsRange.Last7Days);
+
+        Assert.AreEqual(1, snapshot.WeakestCharacters.Count);
+        Assert.AreEqual("a", snapshot.WeakestCharacters.Single().Character);
+    }
+
+    [TestMethod]
+    public async Task AnalyticsQueryService_GetDashboardSnapshot_ModeFilterIsCaseInsensitive()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-2), mode: "Fixed", netWpm: 35));
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-1), mode: "Paragraph", netWpm: 65));
+
+        var snapshot = await database.Analytics.GetDashboardSnapshotAsync(AnalyticsRange.AllTime, "paragraph");
+
+        Assert.AreEqual(1, snapshot.Summary.SessionCount);
+        Assert.AreEqual(65, snapshot.Summary.AverageNetWpm, 0.0001);
+    }
+
+    [TestMethod]
     public async Task AnalyticsQueryService_GetDashboardSnapshot_GroupsDailyMetricsByDate()
     {
         await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
@@ -335,6 +364,20 @@ public sealed class AnalyticsQueryServiceTests
         Assert.AreEqual(55, bestNetWpm.Value, 0.0001);
         Assert.IsTrue(snapshot.PersonalBests.Any(row => row.Kind == "best-paragraph"));
         Assert.IsFalse(snapshot.PersonalBests.Any(row => row.Mode == "Fixed"));
+    }
+
+    [TestMethod]
+    public async Task TrainingHistoryQueryService_ModeFilterIsCaseInsensitive()
+    {
+        await using var database = await AnalyticsTestDatabase.CreateInitializedAsync(NowUtc);
+        var paragraph = CreateSession(startedAtUtc: NowUtc.AddHours(-1), mode: "Paragraph", targetText: new string('a', 120), netWpm: 55, total: 120, correct: 118);
+        await database.SaveAsync(CreateSession(startedAtUtc: NowUtc.AddHours(-2), mode: "Fixed", targetText: new string('a', 120), netWpm: 90, total: 120, correct: 100));
+        await database.SaveAsync(paragraph);
+
+        var snapshot = await database.TrainingHistory.GetTrainingHistoryAsync(AnalyticsRange.AllTime, "paragraph");
+
+        Assert.AreEqual(1, snapshot.QualitySummary.SessionCount);
+        Assert.AreEqual(paragraph.Id, snapshot.PersonalBests.Single(row => row.Kind == "best-net-wpm").SessionId);
     }
 
     [TestMethod]

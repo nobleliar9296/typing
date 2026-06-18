@@ -41,6 +41,9 @@ public sealed record AppSettings(
     public const string QwertyKeyboardLayout = "QWERTY";
     public const string DefaultTrainingFocus = "Balanced";
     public const string DefaultFontFamily = "Cascadia Mono";
+    public const string ConsolasFontFamily = "Consolas";
+    public const string CourierNewFontFamily = "Courier New";
+    public const string LucidaConsoleFontFamily = "Lucida Console";
     public const string DefaultLineWidth = "Comfortable";
     public const string DefaultTextContrast = "Normal";
     public const string UnderlineCursorStyle = "Underline";
@@ -59,6 +62,14 @@ public sealed record AppSettings(
     public const string HighContrastThemePreset = "High Contrast";
     public const string DefaultThemePreset = SystemThemePreset;
     public const string DefaultDifficultyPreset = "Custom";
+
+    public static IReadOnlyList<string> PracticeFontFamilies { get; } =
+    [
+        DefaultFontFamily,
+        ConsolasFontFamily,
+        CourierNewFontFamily,
+        LucidaConsoleFontFamily
+    ];
 
     public static AppSettings Defaults { get; } = new(
         AutoLessonMode,
@@ -108,5 +119,18 @@ public sealed record AppSettings(
             LegacyBoldCursorStyle => BlockCursorStyle,
             _ => DefaultCursorStyle
         };
+    }
+
+    public static string NormalizePracticeFontFamily(string? fontFamily)
+    {
+        var trimmed = fontFamily?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return DefaultFontFamily;
+        }
+
+        return PracticeFontFamilies.FirstOrDefault(
+            family => string.Equals(family, trimmed, StringComparison.OrdinalIgnoreCase))
+            ?? DefaultFontFamily;
     }
 }

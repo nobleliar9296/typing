@@ -219,8 +219,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public string PracticeFontFamily
     {
-        get => _settings.PracticeFontFamily;
-        set => UpdateSettings(_settings with { PracticeFontFamily = value });
+        get => AppSettings.NormalizePracticeFontFamily(_settings.PracticeFontFamily);
+        set => UpdateSettings(_settings with { PracticeFontFamily = AppSettings.NormalizePracticeFontFamily(value) });
     }
 
     public string PracticeLineWidth
@@ -558,6 +558,16 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         SettingsStatus = "Settings saved.";
     }
 
+    public void SetSettingsStatus(string status)
+    {
+        SettingsStatus = status;
+    }
+
+    public void SetImportStatus(string status)
+    {
+        ImportStatus = status;
+    }
+
     public async Task RefreshContentPacksAsync(CancellationToken cancellationToken = default)
     {
         ContentPacks = await _contentQueryService.GetContentPacksAsync(cancellationToken);
@@ -599,7 +609,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            ImportStatus = $"Import failed: {ex.Message}";
+            StartupExceptionLogger.Log("SettingsViewModel.Import", ex);
+            ImportStatus = "Import failed. Check the selected file and try again.";
         }
         finally
         {
@@ -785,10 +796,11 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         {
             if (ReferenceEquals(_importPreviewCancellation, cancellation))
             {
+                StartupExceptionLogger.Log("SettingsViewModel.ImportPreview", ex);
                 ImportOriginalPreviewText = string.Empty;
                 ImportCleanedPreviewText = string.Empty;
                 ImportPreviewNotes = ["Preview unavailable"];
-                ImportPreviewStatus = $"Preview unavailable: {ex.Message}";
+                ImportPreviewStatus = "Preview unavailable. Check the selected file and cleanup options.";
             }
         }
         finally
@@ -872,7 +884,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         {
             if (ReferenceEquals(_settingsAutosaveCancellation, cancellation))
             {
-                SettingsStatus = $"Settings autosave failed: {ex.Message}";
+                StartupExceptionLogger.Log("SettingsViewModel.Autosave", ex);
+                SettingsStatus = "Settings autosave failed. Try again.";
             }
         }
         finally

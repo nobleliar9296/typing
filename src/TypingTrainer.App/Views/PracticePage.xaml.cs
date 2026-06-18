@@ -140,17 +140,17 @@ public sealed partial class PracticePage : Page
         }
     }
 
-    private void RestartAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    private async void RestartAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        ViewModel.StartNewLesson();
+        await ViewModel.StartNewLessonAsync();
         FocusTypingSurface(FocusState.Programmatic);
         QueueScrollToCursor(animate: false);
         args.Handled = true;
     }
 
-    private void RestartButton_Click(object sender, RoutedEventArgs e)
+    private async void RestartButton_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.StartNewLesson();
+        await ViewModel.StartNewLessonAsync();
         FocusTypingSurface(FocusState.Programmatic);
         QueueScrollToCursor(animate: false);
     }
