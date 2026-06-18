@@ -237,8 +237,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public string PracticeCursorStyle
     {
-        get => _settings.PracticeCursorStyle;
-        set => UpdateSettings(_settings with { PracticeCursorStyle = value });
+        get => AppSettings.NormalizeCursorStyle(_settings.PracticeCursorStyle);
+        set => UpdateSettings(_settings with { PracticeCursorStyle = AppSettings.NormalizeCursorStyle(value) });
     }
 
     public string ThemePreset

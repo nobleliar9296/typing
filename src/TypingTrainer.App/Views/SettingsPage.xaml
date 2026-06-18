@@ -212,7 +212,15 @@
                                 <TextBlock Grid.Row="6" Text="Contrast / cursor" VerticalAlignment="Center" />
                                 <StackPanel Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="8">
                                     <TextBox Width="140" Text="{Binding PracticeTextContrast, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <TextBox Width="140" Text="{Binding PracticeCursorStyle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <ComboBox
+                                        x:Name="CursorStyleComboBox"
+                                        Width="150"
+                                        SelectionChanged="CursorStyleComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="Underline" />
+                                        <ComboBoxItem Content="Bar" />
+                                        <ComboBoxItem Content="Block" />
+                                        <ComboBoxItem Content="Outline" />
+                                    </ComboBox>
                                 </StackPanel>
                             </Grid>
 
@@ -228,6 +236,7 @@
                                     <ComboBoxItem Content="Ink" />
                                     <ComboBoxItem Content="Forest" />
                                     <ComboBoxItem Content="Dawn" />
+                                    <ComboBoxItem Content="Monochrome" />
                                     <ComboBoxItem Content="High Contrast" />
                                 </ComboBox>
                             </StackPanel>

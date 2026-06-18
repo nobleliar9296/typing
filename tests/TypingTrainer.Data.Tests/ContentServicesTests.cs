@@ -413,7 +413,7 @@ public sealed class ContentServicesTests
             CountdownSeconds = 3,
             KeySoundEnabled = true,
             MistakeSoundEnabled = true,
-            ThemePreset = "Dark",
+            ThemePreset = AppSettings.MonochromeThemePreset,
             DifficultyPreset = "Speed Words"
         };
 
@@ -428,7 +428,7 @@ public sealed class ContentServicesTests
         Assert.AreEqual(3, stored.CountdownSeconds);
         Assert.IsTrue(stored.KeySoundEnabled);
         Assert.IsTrue(stored.MistakeSoundEnabled);
-        Assert.AreEqual("Dark", stored.ThemePreset);
+        Assert.AreEqual(AppSettings.MonochromeThemePreset, stored.ThemePreset);
         Assert.AreEqual("Speed Words", stored.DifficultyPreset);
     }
 
@@ -632,7 +632,32 @@ public sealed class ContentServicesTests
         Assert.AreEqual("Consolas", settings.PracticeFontFamily);
         Assert.AreEqual("Wide", settings.PracticeLineWidth);
         Assert.AreEqual("High", settings.PracticeTextContrast);
-        Assert.AreEqual("Bold", settings.PracticeCursorStyle);
+        Assert.AreEqual(AppSettings.BlockCursorStyle, settings.PracticeCursorStyle);
+    }
+
+    [TestMethod]
+    public async Task AppSettingsRepository_SaveCursorStyles_PersistsSupportedStylesAndMapsLegacyBold()
+    {
+        await using var database = await ContentTestDatabase.CreateInitializedAsync();
+
+        foreach (var cursorStyle in new[]
+        {
+            AppSettings.UnderlineCursorStyle,
+            AppSettings.BarCursorStyle,
+            AppSettings.BlockCursorStyle,
+            AppSettings.OutlineCursorStyle
+        })
+        {
+            await database.SettingsRepository.SaveSettingsAsync(AppSettings.Defaults with { PracticeCursorStyle = cursorStyle });
+            var settings = await database.SettingsRepository.GetSettingsAsync();
+
+            Assert.AreEqual(cursorStyle, settings.PracticeCursorStyle);
+        }
+
+        await database.SettingsRepository.SaveSettingsAsync(AppSettings.Defaults with { PracticeCursorStyle = AppSettings.LegacyBoldCursorStyle });
+        var legacySettings = await database.SettingsRepository.GetSettingsAsync();
+
+        Assert.AreEqual(AppSettings.BlockCursorStyle, legacySettings.PracticeCursorStyle);
     }
 
     [TestMethod]

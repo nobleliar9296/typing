@@ -5,13 +5,15 @@ namespace TypingTrainer.App.Services;
 
 public sealed class KeyboardSoundPlayer : IDisposable
 {
-    private const int DefaultPlayerPoolSize = 10;
+    private const int DefaultPlayerPoolSize = 24;
+    private const int DefaultMaxPlayerPoolSize = 48;
     private const string SoundPackPath = "Assets/Sounds/Keyboard/unicae_games_keyboard_soundpack_1/Single Keys";
 
-    private readonly MediaPlayer[] _players;
+    private readonly List<MediaPlayer> _players;
     private readonly string[] _keySounds;
     private readonly string[] _mistakeSounds;
     private readonly string[] _correctionSounds;
+    private readonly int _maxPlayerPoolSize;
 
     private int _nextPlayerIndex;
     private int _lastKeySoundIndex = -1;
@@ -28,9 +30,10 @@ public sealed class KeyboardSoundPlayer : IDisposable
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(playerPoolSize);
 
+        _maxPlayerPoolSize = Math.Max(playerPoolSize, DefaultMaxPlayerPoolSize);
         _players = Enumerable.Range(0, playerPoolSize)
-            .Select(_ => new MediaPlayer { AutoPlay = false })
-            .ToArray();
+            .Select(_ => CreatePlayer())
+            .ToList();
 
         var soundDirectory = Path.Combine(baseDirectory, Path.Combine(SoundPackPath.Split('/')));
         _keySounds = BuildSoundList(soundDirectory, 1, 28);
@@ -117,10 +120,45 @@ public sealed class KeyboardSoundPlayer : IDisposable
         return soundIndex;
     }
 
+    private static MediaPlayer CreatePlayer()
+    {
+        return new MediaPlayer
+        {
+            AutoPlay = false,
+            AudioCategory = MediaPlayerAudioCategory.SoundEffects
+        };
+    }
+
     private MediaPlayer NextPlayer()
     {
+        for (var attempt = 0; attempt < _players.Count; attempt++)
+        {
+            var index = (_nextPlayerIndex + attempt) % _players.Count;
+            var candidate = _players[index];
+            if (!IsBusy(candidate))
+            {
+                _nextPlayerIndex = (index + 1) % _players.Count;
+                return candidate;
+            }
+        }
+
+        if (_players.Count < _maxPlayerPoolSize)
+        {
+            var newPlayer = CreatePlayer();
+            _players.Add(newPlayer);
+            _nextPlayerIndex = 0;
+            return newPlayer;
+        }
+
         var player = _players[_nextPlayerIndex];
-        _nextPlayerIndex = (_nextPlayerIndex + 1) % _players.Length;
+        _nextPlayerIndex = (_nextPlayerIndex + 1) % _players.Count;
         return player;
+    }
+
+    private static bool IsBusy(MediaPlayer player)
+    {
+        return player.PlaybackSession.PlaybackState is MediaPlaybackState.Opening
+            or MediaPlaybackState.Buffering
+            or MediaPlaybackState.Playing;
     }
 }

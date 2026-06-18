@@ -18,7 +18,16 @@ public sealed partial class SettingsPage : Page
         AppSettings.InkThemePreset,
         AppSettings.ForestThemePreset,
         AppSettings.DawnThemePreset,
+        AppSettings.MonochromeThemePreset,
         AppSettings.HighContrastThemePreset
+    };
+
+    private static readonly string[] CursorStyles =
+    {
+        AppSettings.UnderlineCursorStyle,
+        AppSettings.BarCursorStyle,
+        AppSettings.BlockCursorStyle,
+        AppSettings.OutlineCursorStyle
     };
 
     private bool _isLoaded;
@@ -63,6 +72,8 @@ public sealed partial class SettingsPage : Page
         };
         var themePresetIndex = Array.IndexOf(ThemePresets, ViewModel.ThemePreset);
         ThemePresetComboBox.SelectedIndex = themePresetIndex >= 0 ? themePresetIndex : 0;
+        var cursorStyleIndex = Array.IndexOf(CursorStyles, AppSettings.NormalizeCursorStyle(ViewModel.PracticeCursorStyle));
+        CursorStyleComboBox.SelectedIndex = cursorStyleIndex >= 0 ? cursorStyleIndex : 0;
         DifficultyPresetComboBox.SelectedIndex = ViewModel.DifficultyPreset switch
         {
             "Speed Words" => 1,
@@ -122,6 +133,18 @@ public sealed partial class SettingsPage : Page
             ? ThemePresets[ThemePresetComboBox.SelectedIndex]
             : AppSettings.DefaultThemePreset;
         AppThemeService.Apply(ViewModel.ThemePreset);
+    }
+
+    private void CursorStyleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded)
+        {
+            return;
+        }
+
+        ViewModel.PracticeCursorStyle = CursorStyleComboBox.SelectedIndex >= 0 && CursorStyleComboBox.SelectedIndex < CursorStyles.Length
+            ? CursorStyles[CursorStyleComboBox.SelectedIndex]
+            : AppSettings.DefaultCursorStyle;
     }
 
     private void DifficultyPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

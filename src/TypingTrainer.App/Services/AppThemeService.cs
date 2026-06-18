@@ -64,6 +64,13 @@ public static class AppThemeService
                 Surface: Color(0xFF, 0xFF, 0xFF),
                 Card: Color(0xFF, 0xFF, 0xFF),
                 Stroke: Color(0xD2, 0xDA, 0xE2)),
+            AppSettings.MonochromeThemePreset => new ThemePreset(
+                ElementTheme.Dark,
+                Accent: Color(0xC8, 0xC8, 0xC8),
+                Background: Color(0x10, 0x10, 0x10),
+                Surface: Color(0x16, 0x16, 0x16),
+                Card: Color(0x1D, 0x1D, 0x1D),
+                Stroke: Color(0x3C, 0x3C, 0x3C)),
             AppSettings.HighContrastThemePreset => new ThemePreset(
                 ElementTheme.Dark,
                 Accent: Color(0xFF, 0xCC, 0x33),
@@ -84,6 +91,7 @@ public static class AppThemeService
             AppSettings.InkThemePreset => AppSettings.InkThemePreset,
             AppSettings.ForestThemePreset => AppSettings.ForestThemePreset,
             AppSettings.DawnThemePreset => AppSettings.DawnThemePreset,
+            AppSettings.MonochromeThemePreset => AppSettings.MonochromeThemePreset,
             AppSettings.HighContrastThemePreset => AppSettings.HighContrastThemePreset,
             _ => AppSettings.SystemThemePreset
         };

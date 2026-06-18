@@ -2,7 +2,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using System.Text;
+using TypingTrainer.Data.Models;
 using TypingTrainer.Core.Typing;
 using Windows.UI;
 
@@ -44,19 +46,46 @@ public sealed class PracticeTextPresenter : UserControl
     private static readonly SolidColorBrush CorrectedMistakeBrush = new(Color.FromArgb(255, 32, 145, 108));
     private static readonly SolidColorBrush IncorrectBrush = new(Color.FromArgb(255, 196, 43, 55));
     private static readonly SolidColorBrush FallbackTargetBrush = new(Color.FromArgb(255, 18, 18, 18));
+    private static readonly SolidColorBrush FallbackCursorBrush = new(Color.FromArgb(255, 0, 120, 212));
 
+    private readonly Grid _host = new() { Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)) };
+    private readonly TranslateTransform _cursorTransform = new();
+    private readonly Border _cursor = new()
+    {
+        HorizontalAlignment = HorizontalAlignment.Left,
+        VerticalAlignment = VerticalAlignment.Top,
+        IsHitTestVisible = false,
+        RenderTransformOrigin = new Windows.Foundation.Point(0, 0),
+        Visibility = Visibility.Collapsed
+    };
     private readonly TextBlock _textBlock = new()
     {
         FontFamily = new FontFamily("Cascadia Mono, Consolas"),
         FontSize = 34,
         LineHeight = 48,
-        TextWrapping = TextWrapping.Wrap
+        TextWrapping = TextWrapping.NoWrap
     };
+    private readonly TextBlock _measureTextBlock = new()
+    {
+        FontFamily = new FontFamily("Cascadia Mono, Consolas"),
+        FontSize = 34,
+        LineHeight = 48,
+        TextWrapping = TextWrapping.NoWrap
+    };
+    private Storyboard? _cursorStoryboard;
+    private bool _hasCursorPosition;
+    private Windows.Foundation.Rect? _lastCursorBounds;
 
     public PracticeTextPresenter()
     {
-        Content = _textBlock;
+        _cursor.RenderTransform = _cursorTransform;
+        Canvas.SetZIndex(_cursor, 2);
+        Canvas.SetZIndex(_textBlock, 1);
+        _host.Children.Add(_cursor);
+        _host.Children.Add(_textBlock);
+        Content = _host;
         ApplyDisplayScale();
+        SizeChanged += (_, _) => Render();
     }
 
     public TypingStateSnapshot? State
@@ -91,38 +120,7 @@ public sealed class PracticeTextPresenter : UserControl
 
     public double GetEstimatedCursorOffsetY()
     {
-        if (State is null || State.TargetText.Length == 0)
-        {
-            return 0;
-        }
-
-        var scale = Math.Clamp(DisplayScale, 0.5, 1.3);
-        var fontSize = 34 * scale;
-        var lineHeight = 48 * scale;
-        var availableWidth = Math.Max(ActualWidth, 1);
-        var estimatedCharactersPerLine = Math.Max(12, (int)Math.Floor(availableWidth / (fontSize * 0.58)));
-        var cursor = Math.Clamp(State.CursorIndex, 0, State.TargetText.Length);
-        var line = 0;
-        var column = 0;
-
-        for (var index = 0; index < cursor; index++)
-        {
-            if (State.TargetText[index] == '\n')
-            {
-                line++;
-                column = 0;
-                continue;
-            }
-
-            column++;
-            if (column >= estimatedCharactersPerLine)
-            {
-                line++;
-                column = 0;
-            }
-        }
-
-        return Math.Max(0, line * lineHeight);
+        return GetEstimatedCursorBounds().Y;
     }
 
     private static void OnStateChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
@@ -147,6 +145,10 @@ public sealed class PracticeTextPresenter : UserControl
         _textBlock.FontFamily = new FontFamily(string.IsNullOrWhiteSpace(FontFamilyName) ? "Cascadia Mono, Consolas" : $"{FontFamilyName}, Consolas");
         _textBlock.FontSize = 34 * scale;
         _textBlock.LineHeight = 48 * scale;
+        _measureTextBlock.FontFamily = _textBlock.FontFamily;
+        _measureTextBlock.FontSize = _textBlock.FontSize;
+        _measureTextBlock.LineHeight = _textBlock.LineHeight;
+        UpdateCursor(animate: false);
     }
 
     private void Render()
@@ -155,22 +157,31 @@ public sealed class PracticeTextPresenter : UserControl
 
         if (State is null)
         {
+            _cursor.Visibility = Visibility.Collapsed;
             return;
         }
 
         var textBuilder = new StringBuilder();
         VisualCharacterState? activeState = null;
 
-        foreach (var character in State.Characters)
+        var layout = BuildCharacterLayout();
+
+        for (var index = 0; index < State.Characters.Count; index++)
         {
+            var character = State.Characters[index];
             var visualState = GetVisualState(character);
+
+            if (index > 0
+                && layout[index].Line > layout[index - 1].Line
+                && State.Characters[index - 1].ExpectedChar != '\n')
+            {
+                textBuilder.Append('\n');
+            }
 
             if (visualState == VisualCharacterState.Current)
             {
                 FlushRun(textBuilder, activeState);
-                activeState = null;
-                AddCurrentRun(character.ExpectedChar);
-                continue;
+                activeState = visualState;
             }
 
             if (activeState is not null && activeState != visualState)
@@ -183,6 +194,7 @@ public sealed class PracticeTextPresenter : UserControl
         }
 
         FlushRun(textBuilder, activeState);
+        UpdateCursor();
     }
 
     private void FlushRun(StringBuilder textBuilder, VisualCharacterState? state)
@@ -201,31 +213,292 @@ public sealed class PracticeTextPresenter : UserControl
         textBuilder.Clear();
     }
 
-    private void AddCurrentRun(char expectedChar)
+    private void UpdateCursor(bool animate = true)
     {
-        if (string.Equals(CursorStyle, "Bold", StringComparison.OrdinalIgnoreCase))
+        if (State is null || State.IsComplete || State.CurrentExpectedCharacter is null)
         {
-            _textBlock.Inlines.Add(new Run
-            {
-                Text = expectedChar.ToString(),
-                Foreground = GetBrush(VisualCharacterState.Current),
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold
-            });
+            _cursor.Visibility = Visibility.Collapsed;
+            _hasCursorPosition = false;
+            _lastCursorBounds = null;
             return;
         }
 
-        var underline = new Underline
+        var style = AppSettings.NormalizeCursorStyle(CursorStyle);
+        var bounds = GetEstimatedCursorBounds();
+        var cursorShape = CreateCursorShape(bounds, style);
+
+        ConfigureCursorStyle(style);
+        MoveCursor(cursorShape, animate && _hasCursorPosition);
+        _hasCursorPosition = true;
+        _cursor.Visibility = Visibility.Visible;
+    }
+
+    private Windows.Foundation.Rect GetEstimatedCursorBounds()
+    {
+        if (State is null || State.TargetText.Length == 0)
         {
-            Foreground = GetBrush(VisualCharacterState.Current)
+            return new Windows.Foundation.Rect(0, 0, 0, 0);
+        }
+
+        var scale = Math.Clamp(DisplayScale, 0.5, 1.3);
+        var fontSize = _textBlock.FontSize;
+        var lineHeight = 48 * scale;
+        var characterWidth = MeasureCharacterWidth();
+        var cursor = Math.Clamp(State.CursorIndex, 0, State.TargetText.Length);
+        var position = GetCursorPosition(cursor);
+
+        return new Windows.Foundation.Rect(position.Column * characterWidth, position.Line * lineHeight, characterWidth, lineHeight);
+    }
+
+    private CharacterLayoutPosition GetCursorPosition(int cursor)
+    {
+        if (State is null || State.Characters.Count == 0)
+        {
+            return new CharacterLayoutPosition(0, 0);
+        }
+
+        var layout = BuildCharacterLayout();
+        if (cursor < layout.Length)
+        {
+            return layout[cursor];
+        }
+
+        var lastCharacter = State.Characters[^1];
+        var lastPosition = layout[^1];
+        if (lastCharacter.ExpectedChar == '\n')
+        {
+            return new CharacterLayoutPosition(lastPosition.Line + 1, 0);
+        }
+
+        var nextColumn = lastPosition.Column + 1;
+        if (nextColumn >= GetColumnCapacity())
+        {
+            return new CharacterLayoutPosition(lastPosition.Line + 1, 0);
+        }
+
+        return new CharacterLayoutPosition(lastPosition.Line, nextColumn);
+    }
+
+    private CharacterLayoutPosition[] BuildCharacterLayout()
+    {
+        if (State is null || State.Characters.Count == 0)
+        {
+            return [];
+        }
+
+        var layout = new CharacterLayoutPosition[State.Characters.Count];
+        var maxColumns = GetColumnCapacity();
+        var line = 0;
+        var start = 0;
+
+        while (start < State.Characters.Count)
+        {
+            if (State.Characters[start].ExpectedChar == '\n')
+            {
+                layout[start] = new CharacterLayoutPosition(line, 0);
+                line++;
+                start++;
+                continue;
+            }
+
+            var lineEnd = FindLineEnd(start, maxColumns);
+            if (lineEnd <= start)
+            {
+                lineEnd = Math.Min(start + 1, State.Characters.Count);
+            }
+
+            for (var index = start; index < lineEnd; index++)
+            {
+                layout[index] = new CharacterLayoutPosition(line, index - start);
+            }
+
+            start = lineEnd;
+            if (start < State.Characters.Count && State.Characters[start].ExpectedChar != '\n')
+            {
+                line++;
+            }
+        }
+
+        return layout;
+    }
+
+    private int FindLineEnd(int start, int maxColumns)
+    {
+        if (State is null)
+        {
+            return start;
+        }
+
+        var count = State.Characters.Count;
+        var hardLimit = Math.Min(start + maxColumns, count);
+        for (var index = start; index < hardLimit; index++)
+        {
+            if (State.Characters[index].ExpectedChar == '\n')
+            {
+                return index;
+            }
+        }
+
+        if (hardLimit >= count)
+        {
+            return count;
+        }
+
+        var lastSpace = -1;
+        for (var index = start; index < hardLimit; index++)
+        {
+            if (State.Characters[index].ExpectedChar == ' ')
+            {
+                lastSpace = index;
+            }
+        }
+
+        return lastSpace > start ? lastSpace + 1 : hardLimit;
+    }
+
+    private int GetColumnCapacity()
+    {
+        var characterWidth = MeasureCharacterWidth();
+        var availableWidth = GetAvailableTextWidth();
+        return Math.Max(1, (int)Math.Floor(availableWidth / Math.Max(characterWidth, 1)));
+    }
+
+    private double MeasureCharacterWidth()
+    {
+        var fallbackWidth = Math.Max(1, _textBlock.FontSize * 0.58);
+        const int sampleLength = 40;
+
+        _measureTextBlock.Text = new string('m', sampleLength);
+        _measureTextBlock.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        var measuredWidth = _measureTextBlock.DesiredSize.Width / sampleLength;
+        return double.IsFinite(measuredWidth) && measuredWidth > 0 ? measuredWidth : fallbackWidth;
+    }
+
+    private double GetAvailableTextWidth()
+    {
+        if (ActualWidth > 1)
+        {
+            return ActualWidth;
+        }
+
+        if (_textBlock.ActualWidth > 1)
+        {
+            return _textBlock.ActualWidth;
+        }
+
+        return double.IsFinite(MaxWidth) && MaxWidth > 1 ? MaxWidth : 1040;
+    }
+
+    private Windows.Foundation.Rect CreateCursorShape(Windows.Foundation.Rect characterBounds, string style)
+    {
+        var scale = Math.Clamp(DisplayScale, 0.5, 1.3);
+        var fontSize = 34 * scale;
+        var lineHeight = characterBounds.Height;
+        var characterWidth = Math.Max(characterBounds.Width, fontSize * 0.45);
+
+        return style switch
+        {
+            AppSettings.BarCursorStyle => new Windows.Foundation.Rect(
+                Math.Max(0, characterBounds.X - (1.5 * scale)),
+                characterBounds.Y + Math.Max(0, (lineHeight - (fontSize * 1.08)) / 2),
+                Math.Max(2, 3 * scale),
+                fontSize * 1.08),
+            AppSettings.BlockCursorStyle or AppSettings.OutlineCursorStyle => new Windows.Foundation.Rect(
+                characterBounds.X,
+                characterBounds.Y + Math.Max(0, (lineHeight - (fontSize * 1.12)) / 2),
+                characterWidth,
+                fontSize * 1.12),
+            _ => new Windows.Foundation.Rect(
+                characterBounds.X,
+                characterBounds.Y + Math.Max(0, lineHeight - (7 * scale)),
+                characterWidth,
+                Math.Max(3, 4 * scale))
+        };
+    }
+
+    private void ConfigureCursorStyle(string style)
+    {
+        var cursorColor = GetCursorColor();
+        var cursorBrush = new SolidColorBrush(cursorColor);
+
+        _cursor.BorderBrush = null;
+        _cursor.Background = cursorBrush;
+        _cursor.BorderThickness = new Thickness(0);
+        _cursor.CornerRadius = new CornerRadius(2);
+        _cursor.Opacity = 1;
+        Canvas.SetZIndex(_cursor, 2);
+
+        switch (style)
+        {
+            case AppSettings.BlockCursorStyle:
+                _cursor.Background = new SolidColorBrush(Color.FromArgb(52, cursorColor.R, cursorColor.G, cursorColor.B));
+                _cursor.CornerRadius = new CornerRadius(4);
+                Canvas.SetZIndex(_cursor, 0);
+                break;
+            case AppSettings.OutlineCursorStyle:
+                _cursor.Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0));
+                _cursor.BorderBrush = cursorBrush;
+                _cursor.BorderThickness = new Thickness(2);
+                _cursor.CornerRadius = new CornerRadius(4);
+                break;
+            case AppSettings.BarCursorStyle:
+                _cursor.CornerRadius = new CornerRadius(2);
+                break;
+        }
+    }
+
+    private void MoveCursor(Windows.Foundation.Rect bounds, bool animate)
+    {
+        var startBounds = _lastCursorBounds
+            ?? new Windows.Foundation.Rect(_cursorTransform.X, _cursorTransform.Y, _cursor.Width, _cursor.Height);
+        _cursorStoryboard?.Stop();
+        _cursorStoryboard = null;
+
+        if (!animate)
+        {
+            ApplyCursorBounds(bounds);
+            _lastCursorBounds = bounds;
+            return;
+        }
+
+        ApplyCursorBounds(startBounds);
+        _cursorStoryboard = new Storyboard();
+        AddCursorAnimation(_cursorStoryboard, _cursorTransform, nameof(TranslateTransform.X), startBounds.X, bounds.X, enableDependentAnimation: false);
+        AddCursorAnimation(_cursorStoryboard, _cursorTransform, nameof(TranslateTransform.Y), startBounds.Y, bounds.Y, enableDependentAnimation: false);
+        AddCursorAnimation(_cursorStoryboard, _cursor, nameof(Width), startBounds.Width, bounds.Width, enableDependentAnimation: true);
+        AddCursorAnimation(_cursorStoryboard, _cursor, nameof(Height), startBounds.Height, bounds.Height, enableDependentAnimation: true);
+        _cursorStoryboard.Begin();
+        _lastCursorBounds = bounds;
+    }
+
+    private void ApplyCursorBounds(Windows.Foundation.Rect bounds)
+    {
+        _cursorTransform.X = bounds.X;
+        _cursorTransform.Y = bounds.Y;
+        _cursor.Width = bounds.Width;
+        _cursor.Height = bounds.Height;
+    }
+
+    private static void AddCursorAnimation(Storyboard storyboard, DependencyObject target, string property, double from, double to, bool enableDependentAnimation)
+    {
+        var animation = new DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = new Duration(TimeSpan.FromMilliseconds(95)),
+            EnableDependentAnimation = enableDependentAnimation,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
 
-        underline.Inlines.Add(new Run { Text = expectedChar.ToString() });
-        _textBlock.Inlines.Add(underline);
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, property);
+        storyboard.Children.Add(animation);
     }
 
     private static char GetDisplayChar(CharacterSnapshot character)
     {
-        return character.ExpectedChar;
+        return character.ExpectedChar == ' ' ? '\u00B7' : character.ExpectedChar;
     }
 
     private static VisualCharacterState GetVisualState(CharacterSnapshot character)
@@ -262,6 +535,23 @@ public sealed class PracticeTextPresenter : UserControl
         return FallbackTargetBrush;
     }
 
+    private static Color GetCursorColor()
+    {
+        if (Application.Current?.Resources.TryGetValue("SystemAccentColor", out var accentColor) == true
+            && accentColor is Color color)
+        {
+            return color;
+        }
+
+        if (Application.Current?.Resources.TryGetValue("AccentFillColorDefaultBrush", out var accentBrush) == true
+            && accentBrush is SolidColorBrush solidColorBrush)
+        {
+            return solidColorBrush.Color;
+        }
+
+        return FallbackCursorBrush.Color;
+    }
+
     private enum VisualCharacterState
     {
         Pending,
@@ -270,4 +560,6 @@ public sealed class PracticeTextPresenter : UserControl
         CorrectedMistake,
         Incorrect
     }
+
+    private readonly record struct CharacterLayoutPosition(int Line, int Column);
 }

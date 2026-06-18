@@ -43,13 +43,19 @@ public sealed record AppSettings(
     public const string DefaultFontFamily = "Cascadia Mono";
     public const string DefaultLineWidth = "Comfortable";
     public const string DefaultTextContrast = "Normal";
-    public const string DefaultCursorStyle = "Underline";
+    public const string UnderlineCursorStyle = "Underline";
+    public const string BarCursorStyle = "Bar";
+    public const string BlockCursorStyle = "Block";
+    public const string OutlineCursorStyle = "Outline";
+    public const string LegacyBoldCursorStyle = "Bold";
+    public const string DefaultCursorStyle = UnderlineCursorStyle;
     public const string SystemThemePreset = "System";
     public const string DarkThemePreset = "Dark";
     public const string LightThemePreset = "Light";
     public const string InkThemePreset = "Ink";
     public const string ForestThemePreset = "Forest";
     public const string DawnThemePreset = "Dawn";
+    public const string MonochromeThemePreset = "Monochrome";
     public const string HighContrastThemePreset = "High Contrast";
     public const string DefaultThemePreset = SystemThemePreset;
     public const string DefaultDifficultyPreset = "Custom";
@@ -90,4 +96,17 @@ public sealed record AppSettings(
         PracticeCursorStyle: DefaultCursorStyle,
         ThemePreset: DefaultThemePreset,
         DifficultyPreset: DefaultDifficultyPreset);
+
+    public static string NormalizeCursorStyle(string? cursorStyle)
+    {
+        return cursorStyle?.Trim() switch
+        {
+            UnderlineCursorStyle => UnderlineCursorStyle,
+            BarCursorStyle => BarCursorStyle,
+            BlockCursorStyle => BlockCursorStyle,
+            OutlineCursorStyle => OutlineCursorStyle,
+            LegacyBoldCursorStyle => BlockCursorStyle,
+            _ => DefaultCursorStyle
+        };
+    }
 }

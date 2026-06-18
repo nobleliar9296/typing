@@ -374,7 +374,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public string PracticeTextContrast => _settings.PracticeTextContrast;
 
-    public string PracticeCursorStyle => _settings.PracticeCursorStyle;
+    public string PracticeCursorStyle => AppSettings.NormalizeCursorStyle(_settings.PracticeCursorStyle);
 
     public double PracticeLineWidthMax => _settings.PracticeLineWidth switch
     {
