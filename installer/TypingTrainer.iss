@@ -11,11 +11,11 @@
 #endif
 
 #ifndef AppVersion
-  #define AppVersion "1.0.6"
+  #define AppVersion "1.0.7"
 #endif
 
 #ifndef AppVersionQuad
-  #define AppVersionQuad "1.0.6.0"
+  #define AppVersionQuad "1.0.7.0"
 #endif
 
 #ifndef AppPublisherUrl
