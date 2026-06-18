@@ -5,4 +5,5 @@ public sealed record CharacterSnapshot(
     char ExpectedChar,
     char? ActualChar,
     CharacterState State,
-    bool HadRejectedInput = false);
+    bool HadRejectedInput = false,
+    bool HadIncorrectInput = false);

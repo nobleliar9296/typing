@@ -7,6 +7,7 @@ public sealed class TypingSession
 {
     private readonly TypedPosition[] _positions;
     private readonly bool[] _positionWasCleared;
+    private readonly bool[] _positionHadIncorrectInput;
     private readonly TypingSessionOptions _options;
     private readonly List<TypingInputEvent> _events = [];
 
@@ -30,6 +31,7 @@ public sealed class TypingSession
         _options = options ?? TypingSessionOptions.Default;
         _positions = new TypedPosition[targetText.Length];
         _positionWasCleared = new bool[targetText.Length];
+        _positionHadIncorrectInput = new bool[targetText.Length];
     }
 
     public Guid SessionId { get; }
@@ -68,7 +70,8 @@ public sealed class TypingSession
                 TargetText[index],
                 position.ActualChar,
                 state,
-                position.HadRejectedInput);
+                position.HadRejectedInput,
+                _positionHadIncorrectInput[index]);
         }
 
         return new TypingStateSnapshot(
@@ -146,6 +149,7 @@ public sealed class TypingSession
         }
         else
         {
+            _positionHadIncorrectInput[position] = true;
             _incorrectCharacterKeypresses++;
         }
 

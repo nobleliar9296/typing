@@ -17,6 +17,7 @@ public sealed class TypingSessionTests
         Assert.IsTrue(result.WasAccepted);
         Assert.AreEqual(1, result.State.CursorIndex);
         Assert.AreEqual(CharacterState.Correct, result.State.Characters[0].State);
+        Assert.IsFalse(result.State.Characters[0].HadIncorrectInput);
         Assert.AreEqual(CharacterState.Current, result.State.Characters[1].State);
         Assert.AreEqual(1, result.State.TypedCharacterKeypresses);
         Assert.AreEqual(1, result.State.CorrectCharacterKeypresses);
@@ -33,6 +34,7 @@ public sealed class TypingSessionTests
         Assert.AreEqual(1, result.State.CursorIndex);
         Assert.AreEqual(CharacterState.Incorrect, result.State.Characters[0].State);
         Assert.AreEqual('x', result.State.Characters[0].ActualChar);
+        Assert.IsTrue(result.State.Characters[0].HadIncorrectInput);
         Assert.AreEqual(1, result.State.CurrentErrors);
         Assert.AreEqual(1, result.State.IncorrectCharacterKeypresses);
     }
@@ -52,6 +54,7 @@ public sealed class TypingSessionTests
         Assert.AreEqual(CharacterState.Incorrect, result.State.Characters[0].State);
         Assert.AreEqual('x', result.State.Characters[0].ActualChar);
         Assert.IsTrue(result.State.Characters[0].HadRejectedInput);
+        Assert.IsTrue(result.State.Characters[0].HadIncorrectInput);
         Assert.AreEqual(1, result.State.CurrentErrors);
         Assert.AreEqual(1, result.State.TypedCharacterKeypresses);
         Assert.AreEqual(0, result.State.CorrectCharacterKeypresses);
@@ -72,6 +75,7 @@ public sealed class TypingSessionTests
         Assert.AreEqual(CharacterState.Current, result.State.Characters[0].State);
         Assert.IsNull(result.State.Characters[0].ActualChar);
         Assert.IsTrue(result.State.Characters[0].HadRejectedInput);
+        Assert.IsTrue(result.State.Characters[0].HadIncorrectInput);
         Assert.AreEqual(0, result.State.CurrentErrors);
         Assert.AreEqual(1, result.State.BackspaceCount);
         Assert.IsNotNull(result.Event);
@@ -119,6 +123,7 @@ public sealed class TypingSessionTests
         Assert.AreEqual(CharacterState.Correct, result.State.Characters[0].State);
         Assert.AreEqual('a', result.State.Characters[0].ActualChar);
         Assert.IsTrue(result.State.Characters[0].HadRejectedInput);
+        Assert.IsTrue(result.State.Characters[0].HadIncorrectInput);
         Assert.AreEqual(0, result.State.CurrentErrors);
         Assert.AreEqual(1, result.State.BackspaceCount);
         Assert.AreEqual(2, result.State.TypedCharacterKeypresses);
@@ -158,6 +163,7 @@ public sealed class TypingSessionTests
         Assert.IsTrue(correction.WasAccepted);
         Assert.AreEqual(1, correction.State.CursorIndex);
         Assert.AreEqual(CharacterState.Correct, correction.State.Characters[0].State);
+        Assert.IsTrue(correction.State.Characters[0].HadIncorrectInput);
         Assert.AreEqual(0, correction.State.CurrentErrors);
         Assert.AreEqual(2, correction.State.TypedCharacterKeypresses);
         Assert.AreEqual(1, correction.State.CorrectCharacterKeypresses);
@@ -165,6 +171,19 @@ public sealed class TypingSessionTests
         Assert.AreEqual(0.5, correction.State.Accuracy, 0.0001);
         Assert.IsNotNull(correction.Event);
         Assert.IsTrue(correction.Event.WasCorrection);
+    }
+
+    [TestMethod]
+    public void BackspaceAfterCorrectCharacterDoesNotMarkPositionAsHavingIncorrectInput()
+    {
+        var session = new TypingSession("ab");
+
+        session.ProcessCharacter('a', timestampTicks: 0);
+        session.ProcessBackspace(timestampTicks: Stopwatch.Frequency / 2);
+        var result = session.ProcessCharacter('a', timestampTicks: Stopwatch.Frequency);
+
+        Assert.AreEqual(CharacterState.Correct, result.State.Characters[0].State);
+        Assert.IsFalse(result.State.Characters[0].HadIncorrectInput);
     }
 
     [TestMethod]

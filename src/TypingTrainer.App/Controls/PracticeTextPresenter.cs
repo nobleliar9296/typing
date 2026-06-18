@@ -41,7 +41,7 @@ public sealed class PracticeTextPresenter : UserControl
         new PropertyMetadata("Underline", OnStateChanged));
 
     private static readonly SolidColorBrush CorrectBrush = new(Color.FromArgb(255, 132, 136, 140));
-    private static readonly SolidColorBrush LatestCorrectBrush = new(Color.FromArgb(255, 32, 145, 108));
+    private static readonly SolidColorBrush CorrectedMistakeBrush = new(Color.FromArgb(255, 32, 145, 108));
     private static readonly SolidColorBrush IncorrectBrush = new(Color.FromArgb(255, 196, 43, 55));
     private static readonly SolidColorBrush FallbackTargetBrush = new(Color.FromArgb(255, 18, 18, 18));
 
@@ -160,11 +160,10 @@ public sealed class PracticeTextPresenter : UserControl
 
         var textBuilder = new StringBuilder();
         VisualCharacterState? activeState = null;
-        var latestCorrectPosition = GetLatestCorrectPosition(State);
 
         foreach (var character in State.Characters)
         {
-            var visualState = GetVisualState(character, latestCorrectPosition);
+            var visualState = GetVisualState(character);
 
             if (visualState == VisualCharacterState.Current)
             {
@@ -229,11 +228,11 @@ public sealed class PracticeTextPresenter : UserControl
         return character.ExpectedChar;
     }
 
-    private static VisualCharacterState GetVisualState(CharacterSnapshot character, int? latestCorrectPosition)
+    private static VisualCharacterState GetVisualState(CharacterSnapshot character)
     {
         return character.State switch
         {
-            CharacterState.Correct when latestCorrectPosition == character.Position => VisualCharacterState.LatestCorrect,
+            CharacterState.Correct when character.HadIncorrectInput => VisualCharacterState.CorrectedMistake,
             CharacterState.Correct => VisualCharacterState.Correct,
             CharacterState.Incorrect => VisualCharacterState.Incorrect,
             CharacterState.Current => VisualCharacterState.Current,
@@ -241,19 +240,11 @@ public sealed class PracticeTextPresenter : UserControl
         };
     }
 
-    private static int? GetLatestCorrectPosition(TypingStateSnapshot state)
-    {
-        var latestPosition = Math.Min(state.CursorIndex - 1, state.Characters.Count - 1);
-        return latestPosition >= 0 && state.Characters[latestPosition].State == CharacterState.Correct
-            ? latestPosition
-            : null;
-    }
-
     private Brush GetBrush(VisualCharacterState state)
     {
         return state switch
         {
-            VisualCharacterState.LatestCorrect => LatestCorrectBrush,
+            VisualCharacterState.CorrectedMistake => CorrectedMistakeBrush,
             VisualCharacterState.Correct => CorrectBrush,
             VisualCharacterState.Incorrect => IncorrectBrush,
             _ => GetTargetBrush()
@@ -276,7 +267,7 @@ public sealed class PracticeTextPresenter : UserControl
         Pending,
         Current,
         Correct,
-        LatestCorrect,
+        CorrectedMistake,
         Incorrect
     }
 }
