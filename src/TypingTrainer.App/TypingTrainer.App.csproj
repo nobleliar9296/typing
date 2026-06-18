@@ -38,4 +38,15 @@
     <ProjectReference Include="..\TypingTrainer.Core\TypingTrainer.Core.csproj" />
     <ProjectReference Include="..\TypingTrainer.Data\TypingTrainer.Data.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\Sounds\Keyboard\**\*.wav" />
+    <None Remove="Assets\Sounds\Keyboard\**\*.mp3" />
+    <None Remove="Assets\Sounds\Keyboard\**\*.m4a" />
+    <None Remove="Assets\Sounds\Keyboard\**\*.wma" />
+    <Content Include="Assets\Sounds\Keyboard\**\*.wav;Assets\Sounds\Keyboard\**\*.mp3;Assets\Sounds\Keyboard\**\*.m4a;Assets\Sounds\Keyboard\**\*.wma">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

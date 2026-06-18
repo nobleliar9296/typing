@@ -8,6 +8,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using TypingTrainer.App.Controls;
 using TypingTrainer.App.Navigation;
+using TypingTrainer.App.Services;
 using TypingTrainer.App.ViewModels;
 using TypingTrainer.Core.Lessons;
 using Windows.ApplicationModel.DataTransfer;
@@ -28,6 +29,7 @@ public sealed partial class PracticePage : Page
     private Brush? _defaultInputBorderBrush;
     private double? _lastScrollTarget;
     private PracticeLaunchRequest? _pendingLaunchRequest;
+    private KeyboardSoundPlayer? _keyboardSoundPlayer;
 
     public PracticePage()
     {
@@ -47,6 +49,7 @@ public sealed partial class PracticePage : Page
 
         restartAccelerator.Invoked += RestartAccelerator_Invoked;
         KeyboardAccelerators.Add(restartAccelerator);
+        Unloaded += PracticePage_Unloaded;
     }
 
     public PracticeViewModel ViewModel { get; }
@@ -531,24 +534,54 @@ public sealed partial class PracticePage : Page
 
     private void PlayInputSound(PracticeInputFeedback feedback)
     {
+        var fallbackSoundKind = feedback switch
+        {
+            PracticeInputFeedback.Mistake when ViewModel.MistakeSoundEnabled => ElementSoundKind.Focus,
+            PracticeInputFeedback.Correction when ViewModel.KeySoundEnabled => ElementSoundKind.MovePrevious,
+            PracticeInputFeedback.Key when ViewModel.KeySoundEnabled => ElementSoundKind.Invoke,
+            _ => (ElementSoundKind?)null
+        };
+
+        if (fallbackSoundKind is not ElementSoundKind kind)
+        {
+            return;
+        }
+
         try
         {
-            if (feedback == PracticeInputFeedback.Mistake && ViewModel.MistakeSoundEnabled)
+            switch (feedback)
             {
-                ElementSoundPlayer.Play(ElementSoundKind.Focus);
-            }
-            else if (feedback == PracticeInputFeedback.Correction && ViewModel.KeySoundEnabled)
-            {
-                ElementSoundPlayer.Play(ElementSoundKind.MovePrevious);
-            }
-            else if (feedback == PracticeInputFeedback.Key && ViewModel.KeySoundEnabled)
-            {
-                ElementSoundPlayer.Play(ElementSoundKind.Invoke);
+                case PracticeInputFeedback.Mistake:
+                    KeyboardSoundPlayer.PlayMistake();
+                    break;
+                case PracticeInputFeedback.Correction:
+                    KeyboardSoundPlayer.PlayCorrection();
+                    break;
+                case PracticeInputFeedback.Key:
+                    KeyboardSoundPlayer.PlayKey();
+                    break;
             }
         }
         catch
         {
-            // Sound feedback is optional; platform sound failures should never affect typing.
+            PlayTypingElementSound(kind);
+        }
+    }
+
+    private KeyboardSoundPlayer KeyboardSoundPlayer => _keyboardSoundPlayer ??= new KeyboardSoundPlayer();
+
+    private static void PlayTypingElementSound(ElementSoundKind soundKind)
+    {
+        try
+        {
+            var previousState = ElementSoundPlayer.State;
+            ElementSoundPlayer.State = ElementSoundPlayerState.On;
+            ElementSoundPlayer.Play(soundKind);
+            ElementSoundPlayer.State = previousState;
+        }
+        catch
+        {
+            // Typing sounds are optional; platform sound failures should never affect typing.
         }
     }
 
@@ -604,6 +637,12 @@ public sealed partial class PracticePage : Page
         {
             InputBorder.BorderBrush = _defaultInputBorderBrush;
         }
+    }
+
+    private void PracticePage_Unloaded(object sender, RoutedEventArgs e)
+    {
+        _keyboardSoundPlayer?.Dispose();
+        _keyboardSoundPlayer = null;
     }
 
     private static bool IsInteractiveElement(DependencyObject? source)
