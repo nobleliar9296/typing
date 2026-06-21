@@ -197,7 +197,10 @@
                                 <NumberBox Grid.Row="1" Grid.Column="2" Minimum="70" Maximum="130" SmallChange="5" LargeChange="10" Value="{Binding VisualKeyboardScalePercent, Mode=TwoWay}" />
                                 <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding VisualKeyboardScaleText}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
-                                <CheckBox Grid.Row="2" Grid.ColumnSpan="4" Content="Show visual keyboard" IsChecked="{Binding ShowVisualKeyboard, Mode=TwoWay}" />
+                                <StackPanel Grid.Row="2" Grid.ColumnSpan="4" Spacing="6">
+                                    <CheckBox Content="Show visual keyboard" IsChecked="{Binding ShowVisualKeyboard, Mode=TwoWay}" />
+                                    <CheckBox Content="Show dots for spaces" IsChecked="{Binding ShowSpaceDots, Mode=TwoWay}" />
+                                </StackPanel>
                                 <StackPanel Grid.Row="3" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="18">
                                     <CheckBox Content="Show finger colors" IsChecked="{Binding ShowFingerColors, Mode=TwoWay}" />
                                     <CheckBox Content="Show finger labels" IsChecked="{Binding ShowFingerLabels, Mode=TwoWay}" />

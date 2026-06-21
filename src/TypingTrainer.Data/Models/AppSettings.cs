@@ -34,6 +34,7 @@ public sealed record AppSettings(
     string PracticeLineWidth,
     string PracticeTextContrast,
     string PracticeCursorStyle,
+    bool ShowSpaceDots,
     string ThemePreset,
     string DifficultyPreset)
 {
@@ -105,6 +106,7 @@ public sealed record AppSettings(
         PracticeLineWidth: DefaultLineWidth,
         PracticeTextContrast: DefaultTextContrast,
         PracticeCursorStyle: DefaultCursorStyle,
+        ShowSpaceDots: false,
         ThemePreset: DefaultThemePreset,
         DifficultyPreset: DefaultDifficultyPreset);
 

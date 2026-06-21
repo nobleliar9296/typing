@@ -220,6 +220,7 @@
                                 FontFamilyName="{Binding PracticeFontFamily}"
                                 TextContrast="{Binding PracticeTextContrast}"
                                 CursorStyle="{Binding PracticeCursorStyle}"
+                                ShowSpaceDots="{Binding ShowSpaceDots}"
                                 Background="Transparent"
                                 PointerPressed="InputSurface_PointerPressed"
                                 Tapped="InputSurface_Tapped"

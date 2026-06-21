@@ -241,6 +241,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         set => UpdateSettings(_settings with { PracticeCursorStyle = AppSettings.NormalizeCursorStyle(value) });
     }
 
+    public bool ShowSpaceDots
+    {
+        get => _settings.ShowSpaceDots;
+        set => UpdateSettings(_settings with { ShowSpaceDots = value });
+    }
+
     public string ThemePreset
     {
         get => _settings.ThemePreset;
@@ -734,6 +740,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(PracticeLineWidth));
         OnPropertyChanged(nameof(PracticeTextContrast));
         OnPropertyChanged(nameof(PracticeCursorStyle));
+        OnPropertyChanged(nameof(ShowSpaceDots));
         OnPropertyChanged(nameof(ThemePreset));
         OnPropertyChanged(nameof(DifficultyPreset));
         OnPropertyChanged(nameof(AppVersionText));

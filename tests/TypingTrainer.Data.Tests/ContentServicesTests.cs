@@ -395,6 +395,7 @@ public sealed class ContentServicesTests
         Assert.AreEqual(15, settings.GoalTargetSessionMinutes);
         Assert.AreEqual(1000, settings.GoalTargetEssayWords);
         Assert.AreEqual(AppSettings.DefaultFontFamily, settings.PracticeFontFamily);
+        Assert.IsFalse(settings.ShowSpaceDots);
         Assert.AreEqual(AppSettings.DefaultThemePreset, settings.ThemePreset);
         Assert.AreEqual(AppSettings.DefaultDifficultyPreset, settings.DifficultyPreset);
     }
@@ -622,7 +623,8 @@ public sealed class ContentServicesTests
             PracticeFontFamily = "Consolas",
             PracticeLineWidth = "Wide",
             PracticeTextContrast = "High",
-            PracticeCursorStyle = "Bold"
+            PracticeCursorStyle = "Bold",
+            ShowSpaceDots = true
         });
         var settings = await database.SettingsRepository.GetSettingsAsync();
 
@@ -633,6 +635,7 @@ public sealed class ContentServicesTests
         Assert.AreEqual("Wide", settings.PracticeLineWidth);
         Assert.AreEqual("High", settings.PracticeTextContrast);
         Assert.AreEqual(AppSettings.BlockCursorStyle, settings.PracticeCursorStyle);
+        Assert.IsTrue(settings.ShowSpaceDots);
     }
 
     [TestMethod]

@@ -376,6 +376,8 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
 
     public string PracticeCursorStyle => AppSettings.NormalizeCursorStyle(_settings.PracticeCursorStyle);
 
+    public bool ShowSpaceDots => _settings.ShowSpaceDots;
+
     public double PracticeLineWidthMax => _settings.PracticeLineWidth switch
     {
         "Narrow" => 760,
@@ -1119,6 +1121,7 @@ public sealed class PracticeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(PracticeFontFamily));
         OnPropertyChanged(nameof(PracticeTextContrast));
         OnPropertyChanged(nameof(PracticeCursorStyle));
+        OnPropertyChanged(nameof(ShowSpaceDots));
         OnPropertyChanged(nameof(PracticeLineWidthMax));
         OnPropertyChanged(nameof(VisualKeyboardVisibility));
         OnKeyboardHighlightChanged();

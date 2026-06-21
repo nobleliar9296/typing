@@ -42,10 +42,12 @@ public sealed class PracticeTextPresenter : UserControl
         typeof(PracticeTextPresenter),
         new PropertyMetadata("Underline", OnStateChanged));
 
-    private static readonly SolidColorBrush CorrectBrush = new(Color.FromArgb(255, 132, 136, 140));
-    private static readonly SolidColorBrush CorrectedMistakeBrush = new(Color.FromArgb(255, 32, 145, 108));
-    private static readonly SolidColorBrush IncorrectBrush = new(Color.FromArgb(255, 196, 43, 55));
-    private static readonly SolidColorBrush FallbackTargetBrush = new(Color.FromArgb(255, 18, 18, 18));
+    public static readonly DependencyProperty ShowSpaceDotsProperty = DependencyProperty.Register(
+        nameof(ShowSpaceDots),
+        typeof(bool),
+        typeof(PracticeTextPresenter),
+        new PropertyMetadata(false, OnStateChanged));
+
     private static readonly SolidColorBrush FallbackCursorBrush = new(Color.FromArgb(255, 0, 120, 212));
 
     private readonly Grid _host = new() { Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)) };
@@ -117,6 +119,12 @@ public sealed class PracticeTextPresenter : UserControl
     {
         get => (string)GetValue(CursorStyleProperty);
         set => SetValue(CursorStyleProperty, value);
+    }
+
+    public bool ShowSpaceDots
+    {
+        get => (bool)GetValue(ShowSpaceDotsProperty);
+        set => SetValue(ShowSpaceDotsProperty, value);
     }
 
     public double GetEstimatedCursorOffsetY()
@@ -518,9 +526,11 @@ public sealed class PracticeTextPresenter : UserControl
         storyboard.Children.Add(animation);
     }
 
-    private static char GetDisplayChar(CharacterSnapshot character)
+    private char GetDisplayChar(CharacterSnapshot character)
     {
-        return character.ExpectedChar == ' ' ? '\u00B7' : character.ExpectedChar;
+        return ShowSpaceDots && character.ExpectedChar == ' '
+            ? '\u00B7'
+            : character.ExpectedChar;
     }
 
     private static VisualCharacterState GetVisualState(CharacterSnapshot character)
@@ -539,22 +549,61 @@ public sealed class PracticeTextPresenter : UserControl
     {
         return state switch
         {
-            VisualCharacterState.CorrectedMistake => CorrectedMistakeBrush,
-            VisualCharacterState.Correct => CorrectBrush,
-            VisualCharacterState.Incorrect => IncorrectBrush,
+            VisualCharacterState.CorrectedMistake => GetThemeBrush(
+                "SystemFillColorSuccessBrush",
+                FallbackLightCorrectedMistakeBrush,
+                FallbackDarkCorrectedMistakeBrush),
+            VisualCharacterState.Correct => GetCorrectBrush(),
+            VisualCharacterState.Incorrect => GetThemeBrush(
+                "SystemFillColorCriticalBrush",
+                FallbackLightIncorrectBrush,
+                FallbackDarkIncorrectBrush),
             _ => GetTargetBrush()
         };
     }
 
-    private static Brush GetTargetBrush()
+    private Brush GetCorrectBrush()
     {
-        if (Application.Current?.Resources.TryGetValue("TextFillColorPrimaryBrush", out var brush) == true
+        return string.Equals(TextContrast?.Trim(), "High", StringComparison.OrdinalIgnoreCase)
+            ? GetTargetBrush()
+            : GetThemeBrush("TextFillColorSecondaryBrush", FallbackLightCorrectBrush, FallbackDarkCorrectBrush);
+    }
+
+    private Brush GetTargetBrush()
+    {
+        return GetThemeBrush("TextFillColorPrimaryBrush", FallbackLightTargetBrush, FallbackDarkTargetBrush);
+    }
+
+    private Brush GetThemeBrush(string key, Brush lightFallback, Brush darkFallback)
+    {
+        if (Application.Current?.Resources.TryGetValue(key, out var brush) == true
             && brush is Brush targetBrush)
         {
             return targetBrush;
         }
 
-        return FallbackTargetBrush;
+        return ActualTheme == ElementTheme.Light ? lightFallback : darkFallback;
+    }
+
+    private static SolidColorBrush FallbackLightTargetBrush { get; } = Brush(18, 18, 18);
+
+    private static SolidColorBrush FallbackDarkTargetBrush { get; } = Brush(243, 246, 250);
+
+    private static SolidColorBrush FallbackLightCorrectBrush { get; } = Brush(84, 89, 95);
+
+    private static SolidColorBrush FallbackDarkCorrectBrush { get; } = Brush(188, 194, 201);
+
+    private static SolidColorBrush FallbackLightCorrectedMistakeBrush { get; } = Brush(15, 123, 92);
+
+    private static SolidColorBrush FallbackDarkCorrectedMistakeBrush { get; } = Brush(61, 220, 151);
+
+    private static SolidColorBrush FallbackLightIncorrectBrush { get; } = Brush(178, 35, 46);
+
+    private static SolidColorBrush FallbackDarkIncorrectBrush { get; } = Brush(255, 107, 115);
+
+    private static SolidColorBrush Brush(byte red, byte green, byte blue)
+    {
+        return new SolidColorBrush(Color.FromArgb(255, red, green, blue));
     }
 
     private static Color GetCursorColor()

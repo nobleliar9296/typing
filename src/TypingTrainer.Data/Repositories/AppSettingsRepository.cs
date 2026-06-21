@@ -61,6 +61,7 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             GetString(values, "practice.lineWidth", defaults.PracticeLineWidth),
             GetString(values, "practice.textContrast", defaults.PracticeTextContrast),
             AppSettings.NormalizeCursorStyle(GetString(values, "practice.cursorStyle", defaults.PracticeCursorStyle)),
+            GetBool(values, "practice.showSpaceDots", defaults.ShowSpaceDots),
             GetString(values, "practice.themePreset", defaults.ThemePreset),
             GetString(values, "practice.difficultyPreset", defaults.DifficultyPreset));
     }
@@ -103,6 +104,7 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.lineWidth", settings.PracticeLineWidth, cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.textContrast", settings.PracticeTextContrast, cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.cursorStyle", AppSettings.NormalizeCursorStyle(settings.PracticeCursorStyle), cancellationToken).ConfigureAwait(false);
+        await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.showSpaceDots", Bool(settings.ShowSpaceDots), cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.themePreset", settings.ThemePreset, cancellationToken).ConfigureAwait(false);
         await UpsertAsync(connection, (SqliteTransaction)transaction, "practice.difficultyPreset", settings.DifficultyPreset, cancellationToken).ConfigureAwait(false);
 
