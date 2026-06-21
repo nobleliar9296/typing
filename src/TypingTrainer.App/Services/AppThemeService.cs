@@ -22,7 +22,12 @@ public static class AppThemeService
         "ApplicationPageBackgroundThemeBrush",
         "SolidBackgroundFillColorBaseBrush",
         "CardBackgroundFillColorDefaultBrush",
-        "ControlStrokeColorDefaultBrush"
+        "ControlStrokeColorDefaultBrush",
+        "TextFillColorPrimaryBrush",
+        "TextFillColorSecondaryBrush",
+        "TextFillColorTertiaryBrush",
+        "SystemFillColorCriticalBrush",
+        "SystemFillColorSuccessBrush"
     };
 
     public static void Apply(string? themePreset)
@@ -121,6 +126,7 @@ public static class AppThemeService
         SetBrush(resources, "SolidBackgroundFillColorBaseBrush", preset.Surface);
         SetBrush(resources, "CardBackgroundFillColorDefaultBrush", preset.Card);
         SetBrush(resources, "ControlStrokeColorDefaultBrush", preset.Stroke);
+        SetTextBrushes(resources, preset.RequestedTheme);
     }
 
     private static void ClearResourceOverrides(ResourceDictionary resources)
@@ -140,6 +146,21 @@ public static class AppThemeService
         {
             resources[key] = new SolidColorBrush(color.Value);
         }
+    }
+
+    private static void SetTextBrushes(ResourceDictionary resources, ElementTheme theme)
+    {
+        if (theme == ElementTheme.Default)
+        {
+            return;
+        }
+
+        var light = theme == ElementTheme.Light;
+        resources["TextFillColorPrimaryBrush"] = ThemeContrast.PrimaryTextBrush(light);
+        resources["TextFillColorSecondaryBrush"] = ThemeContrast.SecondaryTextBrush(light);
+        resources["TextFillColorTertiaryBrush"] = ThemeContrast.TertiaryTextBrush(light);
+        resources["SystemFillColorCriticalBrush"] = ThemeContrast.CriticalTextBrush(light);
+        resources["SystemFillColorSuccessBrush"] = ThemeContrast.SuccessTextBrush(light);
     }
 
     private static Color Color(byte red, byte green, byte blue)

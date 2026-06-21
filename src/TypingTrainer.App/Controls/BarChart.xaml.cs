@@ -2,8 +2,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
+using TypingTrainer.App.Services;
 using TypingTrainer.App.ViewModels;
-using Windows.UI;
 
 namespace TypingTrainer.App.Controls;
 
@@ -13,11 +13,6 @@ public sealed partial class BarChart : UserControl
     private const double PlotRight = 18;
     private const double PlotTop = 26;
     private const double PlotBottom = 42;
-
-    private static readonly SolidColorBrush AxisBrush = Brush(92, 96, 100);
-    private static readonly SolidColorBrush GridBrush = Brush(58, 62, 66);
-    private static readonly SolidColorBrush LabelBrush = Brush(202, 205, 208);
-    private static readonly SolidColorBrush BarBrush = Brush(47, 151, 94);
 
     public static readonly DependencyProperty PointsProperty = DependencyProperty.Register(
         nameof(Points),
@@ -34,6 +29,7 @@ public sealed partial class BarChart : UserControl
     public BarChart()
     {
         InitializeComponent();
+        ActualThemeChanged += (_, _) => Render();
     }
 
     public IReadOnlyList<ChartPointViewModel>? Points
@@ -98,7 +94,7 @@ public sealed partial class BarChart : UserControl
             {
                 Width = barWidth,
                 Height = Math.Max(2, barHeight),
-                Fill = BarBrush,
+                Fill = ThemeContrast.ChartPositiveBrush(this),
                 RadiusX = 2,
                 RadiusY = 2
             };
@@ -138,7 +134,7 @@ public sealed partial class BarChart : UserControl
             Y1 = y,
             X2 = PlotLeft + plotWidth,
             Y2 = y,
-            Stroke = isAxis ? AxisBrush : GridBrush,
+            Stroke = isAxis ? ThemeContrast.AxisBrush(this) : ThemeContrast.GridBrush(this),
             StrokeThickness = 1,
             Opacity = isAxis ? 0.75 : 0.55
         });
@@ -152,7 +148,7 @@ public sealed partial class BarChart : UserControl
             Y1 = PlotTop,
             X2 = PlotLeft,
             Y2 = baselineY,
-            Stroke = AxisBrush,
+            Stroke = ThemeContrast.AxisBrush(this),
             StrokeThickness = 1,
             Opacity = 0.75
         });
@@ -171,7 +167,7 @@ public sealed partial class BarChart : UserControl
             Text = text,
             Width = width,
             FontSize = fontSize,
-            Foreground = LabelBrush,
+            Foreground = ThemeContrast.SecondaryTextBrush(this),
             TextAlignment = textAlignment,
             TextTrimming = TextTrimming.CharacterEllipsis,
             MaxLines = 1
@@ -209,10 +205,5 @@ public sealed partial class BarChart : UserControl
         var normalized = value / magnitude;
         var niceNormalized = normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
         return niceNormalized * magnitude;
-    }
-
-    private static SolidColorBrush Brush(byte red, byte green, byte blue)
-    {
-        return new SolidColorBrush(Color.FromArgb(255, red, green, blue));
     }
 }

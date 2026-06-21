@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using System.Text;
+using TypingTrainer.App.Services;
 using TypingTrainer.Data.Models;
 using TypingTrainer.Core.Typing;
 using Windows.UI;
@@ -89,6 +90,7 @@ public sealed class PracticeTextPresenter : UserControl
         Content = _host;
         ApplyDisplayScale();
         SizeChanged += (_, _) => Render();
+        ActualThemeChanged += (_, _) => Render();
     }
 
     public TypingStateSnapshot? State
@@ -549,15 +551,9 @@ public sealed class PracticeTextPresenter : UserControl
     {
         return state switch
         {
-            VisualCharacterState.CorrectedMistake => GetThemeBrush(
-                "SystemFillColorSuccessBrush",
-                FallbackLightCorrectedMistakeBrush,
-                FallbackDarkCorrectedMistakeBrush),
+            VisualCharacterState.CorrectedMistake => ThemeContrast.SuccessTextBrush(this),
             VisualCharacterState.Correct => GetCorrectBrush(),
-            VisualCharacterState.Incorrect => GetThemeBrush(
-                "SystemFillColorCriticalBrush",
-                FallbackLightIncorrectBrush,
-                FallbackDarkIncorrectBrush),
+            VisualCharacterState.Incorrect => ThemeContrast.CriticalTextBrush(this),
             _ => GetTargetBrush()
         };
     }
@@ -566,44 +562,12 @@ public sealed class PracticeTextPresenter : UserControl
     {
         return string.Equals(TextContrast?.Trim(), "High", StringComparison.OrdinalIgnoreCase)
             ? GetTargetBrush()
-            : GetThemeBrush("TextFillColorSecondaryBrush", FallbackLightCorrectBrush, FallbackDarkCorrectBrush);
+            : ThemeContrast.SecondaryTextBrush(this);
     }
 
     private Brush GetTargetBrush()
     {
-        return GetThemeBrush("TextFillColorPrimaryBrush", FallbackLightTargetBrush, FallbackDarkTargetBrush);
-    }
-
-    private Brush GetThemeBrush(string key, Brush lightFallback, Brush darkFallback)
-    {
-        if (Application.Current?.Resources.TryGetValue(key, out var brush) == true
-            && brush is Brush targetBrush)
-        {
-            return targetBrush;
-        }
-
-        return ActualTheme == ElementTheme.Light ? lightFallback : darkFallback;
-    }
-
-    private static SolidColorBrush FallbackLightTargetBrush { get; } = Brush(18, 18, 18);
-
-    private static SolidColorBrush FallbackDarkTargetBrush { get; } = Brush(243, 246, 250);
-
-    private static SolidColorBrush FallbackLightCorrectBrush { get; } = Brush(84, 89, 95);
-
-    private static SolidColorBrush FallbackDarkCorrectBrush { get; } = Brush(188, 194, 201);
-
-    private static SolidColorBrush FallbackLightCorrectedMistakeBrush { get; } = Brush(15, 123, 92);
-
-    private static SolidColorBrush FallbackDarkCorrectedMistakeBrush { get; } = Brush(61, 220, 151);
-
-    private static SolidColorBrush FallbackLightIncorrectBrush { get; } = Brush(178, 35, 46);
-
-    private static SolidColorBrush FallbackDarkIncorrectBrush { get; } = Brush(255, 107, 115);
-
-    private static SolidColorBrush Brush(byte red, byte green, byte blue)
-    {
-        return new SolidColorBrush(Color.FromArgb(255, red, green, blue));
+        return ThemeContrast.PrimaryTextBrush(this);
     }
 
     private static Color GetCursorColor()

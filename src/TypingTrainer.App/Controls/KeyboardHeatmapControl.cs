@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using TypingTrainer.App.Services;
 using TypingTrainer.App.ViewModels;
 using TypingTrainer.Core.Keyboard;
 using Windows.UI;
@@ -35,6 +36,7 @@ public sealed class KeyboardHeatmapControl : UserControl
     {
         Content = _root;
         IsTabStop = false;
+        ActualThemeChanged += (_, _) => Render();
         Render();
     }
 
@@ -64,6 +66,9 @@ public sealed class KeyboardHeatmapControl : UserControl
                     .First(),
                 StringComparer.OrdinalIgnoreCase);
         var panel = new StackPanel { Spacing = 2 };
+        _root.Background = ThemeContrast.IsLightTheme(this)
+            ? ThemeContrast.Brush(242, 245, 248)
+            : TrayBrush;
 
         foreach (var row in _layout.Rows)
         {
@@ -81,16 +86,18 @@ public sealed class KeyboardHeatmapControl : UserControl
                 var key = row.Keys[index];
                 var label = GetHeatmapLabel(key);
                 heatmap.TryGetValue(label, out var value);
+                var keyBrush = value is null ? EmptyBrush : GetHeatBrush(value.WeaknessPercent);
                 var keyBorder = new Border
                 {
-                    Background = value is null ? EmptyBrush : GetHeatBrush(value.WeaknessPercent),
-                    BorderBrush = KeyBorderBrush,
+                    Background = keyBrush,
+                    BorderBrush = ThemeContrast.IsLightTheme(this) ? ThemeContrast.Brush(213, 220, 228) : KeyBorderBrush,
                     BorderThickness = new Thickness(1),
                     Padding = new Thickness(4),
                     Child = new TextBlock
                     {
                         Text = key.PrimaryLabel,
                         FontSize = key.WidthUnits > 1.5 ? 10 : 12,
+                        Foreground = ThemeContrast.ReadableTextBrush(keyBrush.Color),
                         HorizontalAlignment = HorizontalAlignment.Center,
                         VerticalAlignment = VerticalAlignment.Center,
                         TextTrimming = Microsoft.UI.Xaml.TextTrimming.CharacterEllipsis
@@ -109,7 +116,7 @@ public sealed class KeyboardHeatmapControl : UserControl
         _root.Child = panel;
     }
 
-    private static Brush GetHeatBrush(double weaknessPercent)
+    private static SolidColorBrush GetHeatBrush(double weaknessPercent)
     {
         return weaknessPercent switch
         {

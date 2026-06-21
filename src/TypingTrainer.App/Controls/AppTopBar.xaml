@@ -5,7 +5,7 @@
     MinHeight="42">
     <Border
         Padding="18,5"
-        Background="#191919"
+        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
         BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
         BorderThickness="0,0,0,1">
         <Grid ColumnSpacing="18">

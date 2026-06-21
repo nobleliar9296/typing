@@ -3,9 +3,9 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
+using TypingTrainer.App.Services;
 using TypingTrainer.App.ViewModels;
 using Windows.Foundation;
-using Windows.UI;
 
 namespace TypingTrainer.App.Controls;
 
@@ -15,14 +15,6 @@ public sealed partial class TrendLineChart : UserControl
     private const double PlotRight = 18;
     private const double PlotTop = 40;
     private const double PlotBottom = 42;
-
-    private static readonly SolidColorBrush AxisBrush = Brush(92, 96, 100);
-    private static readonly SolidColorBrush GridBrush = Brush(58, 62, 66);
-    private static readonly SolidColorBrush LabelBrush = Brush(202, 205, 208);
-    private static readonly SolidColorBrush LineBrush = Brush(38, 151, 255);
-    private static readonly SolidColorBrush MarkerBrush = Brush(77, 174, 255);
-    private static readonly SolidColorBrush HoverBrush = Brush(120, 205, 255);
-    private static readonly SolidColorBrush TooltipBackgroundBrush = Brush(24, 28, 34);
 
     private RenderedPoint[] _renderedPoints = [];
     private double _baselineY;
@@ -66,6 +58,7 @@ public sealed partial class TrendLineChart : UserControl
     public TrendLineChart()
     {
         InitializeComponent();
+        ActualThemeChanged += (_, _) => Render();
     }
 
     public event EventHandler<ChartPointSelectedEventArgs>? PointSelected;
@@ -211,7 +204,7 @@ public sealed partial class TrendLineChart : UserControl
         ChartCanvas.Children.Add(new Polyline
         {
             Points = pointCollection,
-            Stroke = LineBrush,
+            Stroke = ThemeContrast.ChartLineBrush(this),
             StrokeThickness = 3
         });
 
@@ -226,7 +219,7 @@ public sealed partial class TrendLineChart : UserControl
                 {
                     Width = 7,
                     Height = 7,
-                    Fill = MarkerBrush
+                    Fill = ThemeContrast.ChartMarkerBrush(this)
                 };
                 Canvas.SetLeft(marker, point.X - 3.5);
                 Canvas.SetTop(marker, point.Y - 3.5);
@@ -276,7 +269,7 @@ public sealed partial class TrendLineChart : UserControl
             Y1 = y,
             X2 = PlotLeft + plotWidth,
             Y2 = y,
-            Stroke = isAxis ? AxisBrush : GridBrush,
+            Stroke = isAxis ? ThemeContrast.AxisBrush(this) : ThemeContrast.GridBrush(this),
             StrokeThickness = 1,
             Opacity = isAxis ? 0.75 : 0.55
         });
@@ -290,7 +283,7 @@ public sealed partial class TrendLineChart : UserControl
             Y1 = PlotTop,
             X2 = PlotLeft,
             Y2 = baselineY,
-            Stroke = AxisBrush,
+            Stroke = ThemeContrast.AxisBrush(this),
             StrokeThickness = 1,
             Opacity = 0.75
         });
@@ -309,7 +302,7 @@ public sealed partial class TrendLineChart : UserControl
             Text = text,
             Width = width,
             FontSize = fontSize,
-            Foreground = LabelBrush,
+            Foreground = ThemeContrast.SecondaryTextBrush(this),
             TextAlignment = textAlignment,
             TextTrimming = TextTrimming.CharacterEllipsis,
             MaxLines = 1
@@ -329,7 +322,7 @@ public sealed partial class TrendLineChart : UserControl
             Y1 = PlotTop,
             X2 = renderedPoint.Location.X,
             Y2 = _baselineY,
-            Stroke = HoverBrush,
+            Stroke = ThemeContrast.ChartHoverBrush(this),
             StrokeThickness = 1,
             Opacity = 0.85
         });
@@ -338,8 +331,8 @@ public sealed partial class TrendLineChart : UserControl
         {
             Width = 12,
             Height = 12,
-            Fill = HoverBrush,
-            Stroke = LineBrush,
+            Fill = ThemeContrast.ChartHoverBrush(this),
+            Stroke = ThemeContrast.ChartLineBrush(this),
             StrokeThickness = 2
         };
         Canvas.SetLeft(marker, renderedPoint.Location.X - 6);
@@ -361,8 +354,8 @@ public sealed partial class TrendLineChart : UserControl
         {
             Width = tooltipWidth,
             Padding = new Thickness(10, 7, 10, 7),
-            Background = TooltipBackgroundBrush,
-            BorderBrush = HoverBrush,
+            Background = ThemeContrast.TooltipBackgroundBrush(this),
+            BorderBrush = ThemeContrast.ChartHoverBrush(this),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
             Child = new StackPanel
@@ -374,7 +367,7 @@ public sealed partial class TrendLineChart : UserControl
                     {
                         Text = renderedPoint.Point.Label,
                         FontSize = 11,
-                        Foreground = LabelBrush,
+                        Foreground = ThemeContrast.SecondaryTextBrush(this),
                         TextTrimming = TextTrimming.CharacterEllipsis,
                         MaxLines = 1
                     },
@@ -383,7 +376,7 @@ public sealed partial class TrendLineChart : UserControl
                         Text = FormatValue(renderedPoint.Point.Value),
                         FontSize = 14,
                         FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                        Foreground = HoverBrush
+                        Foreground = ThemeContrast.ChartLineBrush(this)
                     }
                 }
             }
@@ -428,12 +421,6 @@ public sealed partial class TrendLineChart : UserControl
         var niceNormalized = normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
         return niceNormalized * magnitude;
     }
-
-    private static SolidColorBrush Brush(byte red, byte green, byte blue)
-    {
-        return new SolidColorBrush(Color.FromArgb(255, red, green, blue));
-    }
-
     private readonly record struct RenderedPoint(int Index, Point Location, ChartPointViewModel Point);
 }
 

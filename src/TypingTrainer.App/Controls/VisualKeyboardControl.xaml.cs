@@ -2,6 +2,7 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using TypingTrainer.App.Services;
 using TypingTrainer.Core.Keyboard;
 using Windows.UI;
 
@@ -47,12 +48,10 @@ public sealed partial class VisualKeyboardControl : UserControl
 
     private static readonly SolidColorBrush NeutralKeyBrush = Brush(82, 88, 92);
     private static readonly SolidColorBrush NeutralBorderBrush = Brush(54, 57, 60);
-    private static readonly SolidColorBrush NormalTextBrush = Brush(224, 226, 228);
     private static readonly SolidColorBrush HighlightBackgroundBrush = Brush(34, 83, 125);
     private static readonly SolidColorBrush HighlightBorderBrush = Brush(102, 185, 255);
     private static readonly SolidColorBrush ShiftHighlightBackgroundBrush = Brush(66, 70, 78);
     private static readonly SolidColorBrush ShiftHighlightBorderBrush = Brush(232, 191, 87);
-    private static readonly SolidColorBrush HighlightTextBrush = new(Colors.White);
 
     private readonly Dictionary<string, Border> _keyBorders = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VisualKeyboardKey> _keys = new(StringComparer.Ordinal);
@@ -60,6 +59,7 @@ public sealed partial class VisualKeyboardControl : UserControl
     public VisualKeyboardControl()
     {
         InitializeComponent();
+        ActualThemeChanged += (_, _) => UpdateKeyStyles();
     }
 
     public VisualKeyboardLayout? Layout
@@ -204,7 +204,7 @@ public sealed partial class VisualKeyboardControl : UserControl
             Text = text,
             FontSize = fontSize,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = NormalTextBrush,
+            Foreground = ThemeContrast.ReadableTextBrush(NeutralKeyBrush.Color),
             HorizontalAlignment = HorizontalAlignment.Center,
             TextAlignment = TextAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
@@ -221,12 +221,13 @@ public sealed partial class VisualKeyboardControl : UserControl
             var key = _keys[keyId];
             var isCurrent = string.Equals(keyId, HighlightedKeyId, StringComparison.Ordinal);
             var isShift = string.Equals(keyId, HighlightedShiftKeyId, StringComparison.Ordinal);
-
-            border.Background = isCurrent
+            var backgroundBrush = isCurrent
                 ? HighlightBackgroundBrush
                 : isShift
                     ? ShiftHighlightBackgroundBrush
                     : GetNormalKeyBrush(key);
+
+            border.Background = backgroundBrush;
             border.BorderBrush = isCurrent
                 ? HighlightBorderBrush
                 : isShift
@@ -236,13 +237,13 @@ public sealed partial class VisualKeyboardControl : UserControl
                 ? new Thickness(3 * scale)
                 : isShift
                     ? new Thickness(2 * scale)
-                    : new Thickness(1);
+                : new Thickness(1);
             border.Opacity = isCurrent || isShift ? 1.0 : 0.76;
-            SetTextBrush(border, isCurrent || isShift ? HighlightTextBrush : NormalTextBrush);
+            SetTextBrush(border, ThemeContrast.ReadableTextBrush(backgroundBrush.Color));
         }
     }
 
-    private Brush GetNormalKeyBrush(VisualKeyboardKey key)
+    private SolidColorBrush GetNormalKeyBrush(VisualKeyboardKey key)
     {
         return ShowFingerColors ? GetFingerBrush(key.Finger) : NeutralKeyBrush;
     }
