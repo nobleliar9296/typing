@@ -9,6 +9,8 @@ internal sealed record PracticeResponsiveLayoutMetrics(
     bool CompactHeader,
     bool VeryCompactHeader,
     bool StackedSelectors,
+    bool HideLessonContext,
+    bool HideClipboardShortcut,
     bool UseShortClipboardText,
     double PageHorizontalPadding,
     double PageTopPadding,
@@ -87,9 +89,13 @@ internal sealed record PracticeResponsiveLayoutMetrics(
         var compactStats = width < 1120;
         var compactHeader = width < 1100;
         var veryCompactHeader = width < 920;
-        var stackedSelectors = width < 980;
+        var stackedSelectors = width < 620;
+        var hideLessonContext = width < 1120 || height < 720;
+        var hideClipboardShortcut = width < 1120;
         var keyboardMinimumScale = width <= 900 || height < 720 ? 0.45 : 0.58;
-        var keyboardScale = Math.Clamp(scale * (height < 900 ? 0.90 : 1.0), keyboardMinimumScale, 1.0);
+        var requestedKeyboardScale = Math.Clamp(visualKeyboardScale, 0.5, 1.5);
+        var keyboardViewportScale = Math.Clamp(scale * (height < 900 ? 0.90 : 1.0), keyboardMinimumScale, 1.0);
+        var keyboardScale = keyboardViewportScale * requestedKeyboardScale;
 
         var pageHorizontalPadding = Math.Clamp(32 * scale, width < 760 ? 10 : 16, 32);
         var pageTopPadding = Math.Clamp(12 * scale, 8, 14);
@@ -107,15 +113,17 @@ internal sealed record PracticeResponsiveLayoutMetrics(
         var practiceTextDisplayScale = scale * Math.Clamp(practiceTextScale, 0.5, 1.5);
         var availablePracticeTextWidth = Math.Max(280, width - (2 * pageHorizontalPadding) - (2 * inputHorizontalPadding));
         var practiceTextMaxWidth = Math.Min(practiceLineWidthMax, availablePracticeTextWidth);
-        var keyboardMaxWidth = width <= 900 ? Math.Max(320, width - (pageHorizontalPadding * 2)) : 1280;
+        var availableKeyboardWidth = Math.Max(320, width - (pageHorizontalPadding * 2));
+        var keyboardBaseWidth = width <= 900 ? availableKeyboardWidth : Math.Min(1280, availableKeyboardWidth);
+        var keyboardMaxWidth = Math.Min(availableKeyboardWidth, Math.Max(320, keyboardBaseWidth * requestedKeyboardScale));
 
         var compactStatsRowSpacing = Math.Clamp(8 * scale, 6, 10);
         var kpiTileMinHeight = Math.Clamp(58 * scale, 48, 58);
         var compactStatsAllowance = compactStats && statsVisible
-            ? (2 * kpiTileMinHeight) + (2 * compactStatsRowSpacing)
+            ? kpiTileMinHeight + compactStatsRowSpacing
             : 0;
-        var headerHeightFallback = compactHeader ? 92 * scale : 58 * scale;
-        var headerHeight = headerActualHeight > 0 ? headerActualHeight : headerHeightFallback;
+        var headerHeightFallback = hideLessonContext ? 48 * scale : compactHeader ? 92 * scale : 58 * scale;
+        var headerHeight = headerActualHeight > 0 && !hideLessonContext ? headerActualHeight : headerHeightFallback;
         var keyboardHeightEstimate = (306 * keyboardScale) + 18;
         var statusAllowance = 34 * scale;
         var availableTextHeight = height
@@ -141,11 +149,13 @@ internal sealed record PracticeResponsiveLayoutMetrics(
             width,
             height,
             scale,
-            keyboardScale * Math.Clamp(visualKeyboardScale, 0.5, 1.5),
+            keyboardScale,
             compactStats,
             compactHeader,
             veryCompactHeader,
             stackedSelectors,
+            hideLessonContext,
+            hideClipboardShortcut,
             width < 780,
             pageHorizontalPadding,
             pageTopPadding,
@@ -178,8 +188,8 @@ internal sealed record PracticeResponsiveLayoutMetrics(
             Math.Clamp(132 * scale, width < 820 ? 92 : 108, 132),
             Math.Clamp(8 * scale, compactStats ? 6 : 5, 8),
             Math.Clamp(12 * scale, 8, 14),
-            Math.Clamp(14 * scale, 12, 14),
-            Math.Clamp(24 * scale, 18, 24),
+            Math.Clamp(13 * scale, 11, 14),
+            Math.Clamp(22 * scale, 17, 24),
             Math.Clamp(11 * scale, 9, 11),
             Math.Clamp(10 * scale, 6, 10),
             Math.Clamp(8 * scale, 5, 8),
@@ -200,6 +210,6 @@ internal sealed record PracticeResponsiveLayoutMetrics(
 
         var availableWidth = Math.Max(0, width - (2 * pageHorizontalPadding));
         var spacing = Math.Clamp(8 * scale, 6, 10);
-        return Math.Clamp((availableWidth - (2 * spacing)) / 3, 96, 176);
+        return Math.Clamp((availableWidth - (3 * spacing)) / 4, 86, 176);
     }
 }

@@ -409,6 +409,7 @@ public sealed partial class PracticePage : Page
         LessonModeComboBox.Width = metrics.LessonModeWidth;
         LessonSizeComboBox.Width = metrics.LessonSizeWidth;
         ClipboardLessonButton.Content = metrics.UseShortClipboardText ? "Copied text" : "Practice copied text";
+        ClipboardLessonButton.Visibility = metrics.HideClipboardShortcut ? Visibility.Collapsed : Visibility.Visible;
         ClipboardLessonButton.Padding = new Thickness(
             metrics.ClipboardPaddingHorizontal,
             metrics.ClipboardPaddingVertical,
@@ -416,7 +417,7 @@ public sealed partial class PracticePage : Page
             metrics.ClipboardPaddingVertical);
 
         ArrangeHeaderTop(metrics.StackedSelectors);
-        ArrangeContext(metrics.CompactHeader, metrics.VeryCompactHeader);
+        ArrangeContext(metrics);
         ArrangeStatsColumns(metrics);
         SetHeaderTypography(metrics);
         SetKpiTileSizing(metrics);
@@ -450,9 +451,16 @@ public sealed partial class PracticePage : Page
             : HorizontalAlignment.Right;
     }
 
-    private void ArrangeContext(bool compactHeader, bool veryCompactHeader)
+    private void ArrangeContext(PracticeResponsiveLayoutMetrics metrics)
     {
-        if (veryCompactHeader)
+        HeaderContextGrid.Visibility = metrics.HideLessonContext ? Visibility.Collapsed : Visibility.Visible;
+
+        if (metrics.HideLessonContext)
+        {
+            return;
+        }
+
+        if (metrics.VeryCompactHeader)
         {
             ContextColumn0.Width = new GridLength(1, GridUnitType.Star);
             ContextColumn1.Width = new GridLength(0);
@@ -465,7 +473,7 @@ public sealed partial class PracticePage : Page
             return;
         }
 
-        if (compactHeader)
+        if (metrics.CompactHeader)
         {
             ContextColumn0.Width = new GridLength(1, GridUnitType.Star);
             ContextColumn1.Width = new GridLength(1, GridUnitType.Star);
@@ -499,6 +507,11 @@ public sealed partial class PracticePage : Page
     {
         if (metrics.CompactStats)
         {
+            MoveStatTile(ProgressTile, LeftStatsPanel, 3);
+            ElapsedTile.Visibility = Visibility.Collapsed;
+            ErrorsTile.Visibility = Visibility.Collapsed;
+            ProgressTile.Visibility = Visibility.Visible;
+
             LeftStatsColumn.Width = new GridLength(0);
             TextColumn.Width = new GridLength(1, GridUnitType.Star);
             RightStatsColumn.Width = new GridLength(0);
@@ -511,6 +524,11 @@ public sealed partial class PracticePage : Page
             RightStatsPanel.Spacing = metrics.StatsPanelSpacing;
             return;
         }
+
+        MoveStatTile(ProgressTile, RightStatsPanel, 2);
+        ElapsedTile.Visibility = Visibility.Visible;
+        ErrorsTile.Visibility = Visibility.Visible;
+        ProgressTile.Visibility = Visibility.Visible;
 
         LeftStatsColumn.Width = new GridLength(metrics.RailStatsWidth);
         TextColumn.Width = new GridLength(1, GridUnitType.Star);
@@ -538,6 +556,22 @@ public sealed partial class PracticePage : Page
         Grid.SetRow(InputSurface, row);
         Grid.SetColumn(InputSurface, column);
         Grid.SetColumnSpan(InputSurface, columnSpan);
+    }
+
+    private static void MoveStatTile(FrameworkElement tile, StackPanel targetPanel, int targetIndex)
+    {
+        if (tile.Parent is StackPanel currentPanel)
+        {
+            var currentIndex = currentPanel.Children.IndexOf(tile);
+            if (currentPanel == targetPanel && currentIndex == targetIndex)
+            {
+                return;
+            }
+
+            currentPanel.Children.Remove(tile);
+        }
+
+        targetPanel.Children.Insert(Math.Min(targetIndex, targetPanel.Children.Count), tile);
     }
 
     private void SetHeaderTypography(PracticeResponsiveLayoutMetrics metrics)

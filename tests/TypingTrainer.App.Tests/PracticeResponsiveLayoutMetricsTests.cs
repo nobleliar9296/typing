@@ -19,17 +19,32 @@ public sealed class PracticeResponsiveLayoutMetricsTests
     }
 
     [TestMethod]
-    public void FromViewport_NarrowWidthStacksControlsAndUsesCompactStats()
+    public void FromViewport_NarrowWidthKeepsControlsHorizontalAndUsesCompactTopStats()
     {
         var metrics = Create(width: 900, height: 700);
 
         Assert.IsTrue(metrics.CompactStats);
-        Assert.IsTrue(metrics.StackedSelectors);
+        Assert.IsFalse(metrics.StackedSelectors);
         Assert.IsTrue(metrics.CompactHeader);
         Assert.IsTrue(metrics.VeryCompactHeader);
+        Assert.IsTrue(metrics.HideLessonContext);
+        Assert.IsTrue(metrics.HideClipboardShortcut);
         Assert.IsNotNull(metrics.KpiTileWidth);
         Assert.IsTrue(metrics.PracticeTextMaxWidth <= 900);
         Assert.IsTrue(metrics.KeyboardMaxWidth <= 900);
+        Assert.IsTrue(metrics.CompactStatsAllowance <= metrics.KpiTileMinHeight + metrics.CompactStatsRowSpacing);
+    }
+
+    [TestMethod]
+    public void FromViewport_VeryNarrowWidthStacksControls()
+    {
+        var metrics = Create(width: 560, height: 700);
+
+        Assert.IsTrue(metrics.CompactStats);
+        Assert.IsTrue(metrics.StackedSelectors);
+        Assert.IsTrue(metrics.HideLessonContext);
+        Assert.IsNotNull(metrics.KpiTileWidth);
+        Assert.IsTrue(metrics.KpiTileWidth <= 126);
     }
 
     [TestMethod]
@@ -52,6 +67,20 @@ public sealed class PracticeResponsiveLayoutMetricsTests
         Assert.IsTrue(enlarged.PracticeTextDisplayScale > normal.PracticeTextDisplayScale);
         Assert.IsTrue(enlarged.KeyboardScale > normal.KeyboardScale);
         Assert.IsTrue(enlarged.FourLineTextHeight > normal.FourLineTextHeight);
+    }
+
+    [TestMethod]
+    public void FromViewport_UserKeyboardScaleChangesKeyboardSurfaceSize()
+    {
+        var smaller = Create(width: 1366, height: 980, visualKeyboardScale: 0.7);
+        var normal = Create(width: 1366, height: 980, visualKeyboardScale: 1.0);
+        var larger = Create(width: 1366, height: 980, visualKeyboardScale: 1.3);
+
+        Assert.IsTrue(smaller.KeyboardScale < normal.KeyboardScale);
+        Assert.IsTrue(larger.KeyboardScale > normal.KeyboardScale);
+        Assert.IsTrue(smaller.KeyboardMaxWidth < normal.KeyboardMaxWidth);
+        Assert.IsTrue(larger.KeyboardMaxWidth > normal.KeyboardMaxWidth);
+        Assert.IsTrue(larger.KeyboardMaxWidth <= 1366);
     }
 
     [TestMethod]

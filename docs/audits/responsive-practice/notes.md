@@ -76,9 +76,20 @@ Accessibility target: responsive reflow and zoom resilience. This audit is based
 - Enabled horizontal scrolling on fixed-column analytics/content tables instead of clipping them.
 - Added unit tests for desktop, compact-width, compact-height, user text/keyboard scale, popup-fit metrics, and shared page responsive metrics.
 
+## Follow-Up Compact Header Pass
+
+Evidence: user-provided compact Practice screenshot in chat, showing mode controls and lesson metadata taking the top-left space while Progress remained below the typing card.
+
+- Health before follow-up: weak.
+- Moved Progress into the compact top KPI row so small screens show Raw WPM, Net WPM, Accuracy, and Progress directly above the text.
+- Kept Mode, Size, and Zen together in a compact right-side control group for medium-small widths instead of stacking them down the left.
+- Hid secondary lesson context and the copied-text shortcut on compact widths so the first visible content is the useful typing status plus the text itself.
+- Reduced compact KPI allowance to one row so the typing text gets more vertical room.
+- Added tests for the medium-small layout and very narrow fallback behavior.
+
 ## Remaining Follow-Ups
 
-- Consider a two-column header controls layout for medium widths so the 900px view uses horizontal space more efficiently.
+- Capture a fresh 900px follow-up screenshot from the running app to confirm the compact top KPI row and right-side controls in the final rendered state.
 - Add automated visual regression coverage if a desktop UI test harness becomes stable for WinUI.
 - Manually verify at Windows display scales above 125%.
 - Capture additional before/after screenshots for Dashboard, Settings, and Session Detail once the app has representative local data for those pages.
