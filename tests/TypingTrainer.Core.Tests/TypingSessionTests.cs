@@ -266,6 +266,59 @@ public sealed class TypingSessionTests
         Assert.IsNull(result.State.CurrentExpectedCharacter);
     }
 
+    [TestMethod]
+    public void ProcessCharacter_AcceptsNewlineTarget()
+    {
+        var session = new TypingSession("a\nb");
+
+        session.ProcessCharacter('a', timestampTicks: 0);
+        var result = session.ProcessCharacter('\n', timestampTicks: Stopwatch.Frequency);
+
+        Assert.IsTrue(result.WasAccepted);
+        Assert.IsTrue(result.WasCorrect);
+        Assert.AreEqual(2, result.State.CursorIndex);
+        Assert.AreEqual(CharacterState.Correct, result.State.Characters[1].State);
+        Assert.AreEqual('\n', result.State.Characters[1].ExpectedChar);
+        Assert.AreEqual('\n', result.State.Characters[1].ActualChar);
+        Assert.AreEqual('b', result.State.CurrentExpectedCharacter);
+        Assert.IsNotNull(result.Event);
+        Assert.AreEqual('\n', result.Event.ExpectedChar);
+        Assert.AreEqual('\n', result.Event.ActualChar);
+    }
+
+    [TestMethod]
+    public void ProcessCharacter_NormalizesCarriageReturnToNewline()
+    {
+        var session = new TypingSession("a\nb");
+
+        session.ProcessCharacter('a', timestampTicks: 0);
+        var result = session.ProcessCharacter('\r', timestampTicks: Stopwatch.Frequency);
+
+        Assert.IsTrue(result.WasAccepted);
+        Assert.IsTrue(result.WasCorrect);
+        Assert.AreEqual(2, result.State.CursorIndex);
+        Assert.AreEqual(CharacterState.Correct, result.State.Characters[1].State);
+        Assert.AreEqual('\n', result.State.Characters[1].ExpectedChar);
+        Assert.AreEqual('\n', result.State.Characters[1].ActualChar);
+        Assert.AreEqual('b', result.State.CurrentExpectedCharacter);
+    }
+
+    [TestMethod]
+    public void Constructor_NormalizesCrLfTargetText()
+    {
+        var session = new TypingSession("a\r\nb");
+
+        session.ProcessCharacter('a', timestampTicks: 0);
+        session.ProcessCharacter('\n', timestampTicks: Stopwatch.Frequency);
+        var result = session.ProcessCharacter('b', timestampTicks: 2 * Stopwatch.Frequency);
+
+        Assert.AreEqual("a\nb", session.TargetText);
+        Assert.IsTrue(result.State.IsComplete);
+        Assert.AreEqual(3, result.State.TypedCharacterKeypresses);
+        Assert.AreEqual(3, result.State.CorrectCharacterKeypresses);
+        Assert.AreEqual(0, result.State.IncorrectCharacterKeypresses);
+    }
+
     private static TypingSession CreateRequireCorrectSession(string targetText)
     {
         return new TypingSession(

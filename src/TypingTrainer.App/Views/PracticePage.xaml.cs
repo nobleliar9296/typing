@@ -30,6 +30,7 @@ public sealed partial class PracticePage : Page
     private double? _lastScrollTarget;
     private PracticeLaunchRequest? _pendingLaunchRequest;
     private KeyboardSoundPlayer? _keyboardSoundPlayer;
+    private bool _suppressNextEnterCharacterReceived;
 
     public PracticePage()
     {
@@ -110,9 +111,19 @@ public sealed partial class PracticePage : Page
 
         var character = (char)args.Character;
 
-        if (!char.IsControl(character))
+        if (_suppressNextEnterCharacterReceived)
         {
-            PlayInputSound(ViewModel.HandleCharacter(character));
+            _suppressNextEnterCharacterReceived = false;
+            if (IsLineBreakCharacter(character))
+            {
+                args.Handled = true;
+                return;
+            }
+        }
+
+        if (IsTypingCharacter(character))
+        {
+            PlayInputSound(ViewModel.HandleCharacter(NormalizeTypingCharacter(character)));
             QueueScrollToCursor();
             args.Handled = true;
         }
@@ -138,6 +149,28 @@ public sealed partial class PracticePage : Page
             QueueScrollToCursor();
             args.Handled = true;
         }
+        else if (args.Key == VirtualKey.Enter)
+        {
+            _suppressNextEnterCharacterReceived = true;
+            PlayInputSound(ViewModel.HandleCharacter('\n'));
+            QueueScrollToCursor();
+            args.Handled = true;
+        }
+    }
+
+    private static bool IsTypingCharacter(char character)
+    {
+        return !char.IsControl(character) || IsLineBreakCharacter(character);
+    }
+
+    private static bool IsLineBreakCharacter(char character)
+    {
+        return character is '\r' or '\n';
+    }
+
+    private static char NormalizeTypingCharacter(char character)
+    {
+        return character == '\r' ? '\n' : character;
     }
 
     private async void RestartAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)

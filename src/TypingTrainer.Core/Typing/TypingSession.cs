@@ -21,17 +21,18 @@ public sealed class TypingSession
 
     public TypingSession(string targetText, TypingSessionOptions? options = null)
     {
-        if (string.IsNullOrWhiteSpace(targetText))
+        var normalizedTargetText = NormalizeLineBreaks(targetText);
+        if (string.IsNullOrWhiteSpace(normalizedTargetText))
         {
             throw new ArgumentException("Target text must contain at least one printable character.", nameof(targetText));
         }
 
         SessionId = Guid.NewGuid();
-        TargetText = targetText;
+        TargetText = normalizedTargetText;
         _options = options ?? TypingSessionOptions.Default;
-        _positions = new TypedPosition[targetText.Length];
-        _positionWasCleared = new bool[targetText.Length];
-        _positionHadIncorrectInput = new bool[targetText.Length];
+        _positions = new TypedPosition[TargetText.Length];
+        _positionWasCleared = new bool[TargetText.Length];
+        _positionHadIncorrectInput = new bool[TargetText.Length];
     }
 
     public Guid SessionId { get; }
@@ -93,7 +94,9 @@ public sealed class TypingSession
 
     public KeyProcessResult ProcessCharacter(char typedChar, long timestampTicks)
     {
-        if (char.IsControl(typedChar))
+        typedChar = NormalizeTypedCharacter(typedChar);
+
+        if (char.IsControl(typedChar) && typedChar != '\n')
         {
             return Ignored(timestampTicks, "Control characters are ignored by the typing engine.");
         }
@@ -345,6 +348,16 @@ public sealed class TypingSession
         return _startedTimestampTicks is long startedTimestampTicks
             ? MetricsCalculator.TicksToMilliseconds(startedTimestampTicks, timestampTicks)
             : 0;
+    }
+
+    private static string NormalizeLineBreaks(string text)
+    {
+        return text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+    }
+
+    private static char NormalizeTypedCharacter(char typedChar)
+    {
+        return typedChar == '\r' ? '\n' : typedChar;
     }
 
     private readonly record struct TypedPosition(
