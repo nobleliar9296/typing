@@ -9,12 +9,19 @@ public sealed partial class MainWindow : Window
 {
     public static MainWindow? Instance { get; private set; }
 
+#if DEBUG
+    private readonly Services.DpiDebugLogger _dpiDebugLogger;
+#endif
+
     public MainWindow()
     {
         InitializeComponent();
         Instance = this;
         TopBar.NavigateRequested += TopBar_NavigateRequested;
         RootFrame.Navigated += RootFrame_Navigated;
+#if DEBUG
+        _dpiDebugLogger = Services.DpiDebugLogger.Attach(this);
+#endif
         NavigateToCore(typeof(PracticePage), null, useTransition: false);
     }
 

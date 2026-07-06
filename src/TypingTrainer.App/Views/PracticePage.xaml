@@ -82,7 +82,7 @@
                         OffContent="Zen"
                         OnContent="Zen"
                         IsOn="{Binding ZenModeEnabled, Mode=TwoWay}" />
-                    <Button Content="Practice copied text" Click="ClipboardLessonButton_Click" />
+                    <Button x:Name="ClipboardLessonButton" Content="Practice copied text" Click="ClipboardLessonButton_Click" />
                 </StackPanel>
             </Grid>
 
@@ -145,6 +145,10 @@
             x:Name="PracticeContentHost"
             Grid.Row="1"
             Opacity="{Binding PracticeContentOpacity}">
+        <ScrollViewer
+            x:Name="PracticeContentScrollViewer"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto">
         <StackPanel
             x:Name="PracticeContentPanel"
             Margin="32,0,32,0"
@@ -155,9 +159,14 @@
                 x:Name="PracticeTypingGrid"
                 ColumnSpacing="12"
                 HorizontalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="LeftStatsColumn" Width="132" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="TextColumn" Width="*" />
                     <ColumnDefinition x:Name="RightStatsColumn" Width="132" />
                 </Grid.ColumnDefinitions>
 
@@ -310,6 +319,7 @@
                 ShowFingerLabels="{Binding ShowFingerLabels}"
                 Visibility="{Binding VisualKeyboardVisibility}" />
         </StackPanel>
+        </ScrollViewer>
         </Grid>
 
         <Grid
@@ -318,6 +328,7 @@
             Background="#CC0A0F16"
             Visibility="{Binding ReviewPopupVisibility}">
             <Border
+                x:Name="ReviewDialogBorder"
                 MaxWidth="1040"
                 Margin="48"
                 Padding="28"
@@ -342,6 +353,7 @@
                         <FontIcon FontSize="14" Glyph="&#xE711;" />
                     </Button>
                 <ScrollViewer
+                    x:Name="ReviewScrollViewer"
                     Grid.Row="1"
                     MaxHeight="676"
                     HorizontalScrollBarVisibility="Disabled"

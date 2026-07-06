@@ -4,23 +4,30 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:TypingTrainer.App.Controls"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-    Loaded="DashboardPage_Loaded">
+    Loaded="DashboardPage_Loaded"
+    SizeChanged="DashboardPage_SizeChanged">
 
-    <Grid RowSpacing="24">
+    <Grid x:Name="DashboardRootGrid" RowSpacing="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="32,24,32,0" ColumnSpacing="24">
+        <Grid x:Name="DashboardHeaderGrid" Grid.Row="0" Margin="32,24,32,0" ColumnSpacing="24" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="DashboardHeaderTitleColumn" Width="*" />
+                <ColumnDefinition x:Name="DashboardHeaderModeColumn" Width="Auto" />
+                <ColumnDefinition x:Name="DashboardHeaderRangeColumn" Width="Auto" />
+                <ColumnDefinition x:Name="DashboardHeaderKeysColumn" Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Spacing="3">
+            <StackPanel x:Name="DashboardTitlePanel" Spacing="3">
                 <TextBlock
                     Text="Analytics"
                     FontSize="28"
@@ -30,7 +37,7 @@
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+            <StackPanel x:Name="ModeFilterPanel" Grid.Column="1" Spacing="8" VerticalAlignment="Center">
                 <TextBlock
                     Text="Mode"
                     HorizontalAlignment="Right"
@@ -51,7 +58,7 @@
                 </ComboBox>
             </StackPanel>
 
-            <StackPanel Grid.Column="2" Spacing="8" VerticalAlignment="Center">
+            <StackPanel x:Name="RangeFilterPanel" Grid.Column="2" Spacing="8" VerticalAlignment="Center">
                 <TextBlock
                     Text="Range"
                     HorizontalAlignment="Right"
@@ -67,7 +74,7 @@
                 </ComboBox>
             </StackPanel>
 
-            <StackPanel Grid.Column="3" Spacing="8" VerticalAlignment="Center">
+            <StackPanel x:Name="KeyFilterPanel" Grid.Column="3" Spacing="8" VerticalAlignment="Center">
                 <TextBlock
                     Text="Keys"
                     HorizontalAlignment="Right"
@@ -90,8 +97,8 @@
             </StackPanel>
         </Grid>
 
-        <ScrollViewer Grid.Row="1" Margin="32,0,32,24">
-            <StackPanel Spacing="24">
+        <ScrollViewer x:Name="DashboardScrollViewer" Grid.Row="1" Margin="32,0,32,24">
+            <StackPanel x:Name="DashboardContentPanel" Spacing="24">
                 <ProgressRing
                     Width="32"
                     Height="32"
@@ -112,13 +119,18 @@
                     Visibility="{Binding EmptyStateVisibility}" />
 
                 <Border
+                    x:Name="GoalPanelCard"
                     Padding="16"
                     BorderThickness="1"
                     BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                     CornerRadius="8"
                     Visibility="{Binding GoalPanelVisibility}">
                     <StackPanel Spacing="14">
-                        <Grid ColumnSpacing="16">
+                        <Grid x:Name="GoalHeaderGrid" ColumnSpacing="16" RowSpacing="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -137,7 +149,7 @@
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </Grid>
 
-                        <Grid ColumnSpacing="12" RowSpacing="12">
+                        <Grid x:Name="GoalMetricsGrid" ColumnSpacing="12" RowSpacing="12">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -175,7 +187,13 @@
                             </StackPanel>
                         </Grid>
 
-                        <Grid ColumnSpacing="12">
+                        <Grid x:Name="GoalInputsGrid" ColumnSpacing="12" RowSpacing="12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="170" />
                                 <ColumnDefinition Width="170" />
@@ -183,6 +201,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <NumberBox
+                                x:Name="GoalTargetWpmNumberBox"
                                 Header="Target net WPM"
                                 Minimum="10"
                                 Maximum="250"
@@ -190,6 +209,7 @@
                                 LargeChange="5"
                                 Value="{Binding GoalTargetNetWpm, Mode=TwoWay}" />
                             <NumberBox
+                                x:Name="GoalTargetAccuracyNumberBox"
                                 Grid.Column="1"
                                 Header="Target accuracy %"
                                 Minimum="50"
@@ -198,6 +218,7 @@
                                 LargeChange="5"
                                 Value="{Binding GoalTargetAccuracyPercent, Mode=TwoWay}" />
                             <NumberBox
+                                x:Name="GoalWeeklyMinutesNumberBox"
                                 Grid.Column="2"
                                 Header="Weekly minutes"
                                 Minimum="0"
@@ -206,6 +227,7 @@
                                 LargeChange="30"
                                 Value="{Binding GoalWeeklyPracticeMinutes, Mode=TwoWay}" />
                             <Button
+                                x:Name="SaveGoalsButton"
                                 Grid.Column="3"
                                 Content="Save Goals"
                                 VerticalAlignment="Bottom"
@@ -244,11 +266,12 @@
                 </Border>
 
                 <ItemsControl
+                    x:Name="InsightRowsItemsControl"
                     ItemsSource="{Binding InsightRows}"
                     Visibility="{Binding GoalPanelVisibility}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <ItemsStackPanel Orientation="Horizontal" />
+                            <ItemsWrapGrid Orientation="Horizontal" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -283,19 +306,29 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <Grid ColumnSpacing="16" RowSpacing="16" Visibility="{Binding GoalPanelVisibility}">
+                <Grid x:Name="DailyCoachGrid" ColumnSpacing="16" RowSpacing="16" Visibility="{Binding GoalPanelVisibility}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1.2*" />
                         <ColumnDefinition Width="1*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                    <Border x:Name="DailyCoachCard" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                         <StackPanel Spacing="12">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Daily Coach" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="{Binding DailyPlan.Summary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <ListView ItemsSource="{Binding DailyPlanRows}" SelectionMode="None" MaxHeight="220">
+                            <ListView
+                                x:Name="DailyPlanListView"
+                                ItemsSource="{Binding DailyPlanRows}"
+                                SelectionMode="None"
+                                MaxHeight="220"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.HorizontalScrollMode="Enabled">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="10" Padding="0,7">
@@ -319,13 +352,13 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                    <Border x:Name="AchievementsCard" Grid.Column="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                         <StackPanel Spacing="12">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Achievements" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="Computed locally from saved practice history." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
-                            <ListView ItemsSource="{Binding AchievementRows}" SelectionMode="None" MaxHeight="220">
+                            <ListView x:Name="AchievementsListView" ItemsSource="{Binding AchievementRows}" SelectionMode="None" MaxHeight="220">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="10" Padding="0,6">
@@ -347,7 +380,7 @@
                 </Grid>
 
                 <StackPanel Spacing="24" Visibility="{Binding DashboardContentVisibility}">
-                    <Grid ColumnSpacing="12" RowSpacing="12">
+                    <Grid x:Name="SummaryMetricsGrid" ColumnSpacing="12" RowSpacing="12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -358,42 +391,42 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="SessionsSummaryCard" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel>
                                 <TextBlock Text="{Binding SessionCountText}" FontSize="26" FontWeight="SemiBold" />
                                 <TextBlock Text="Sessions" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="PracticeTimeSummaryCard" Grid.Column="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel>
                                 <TextBlock Text="{Binding PracticeTimeText}" FontSize="26" FontWeight="SemiBold" />
                                 <TextBlock Text="Practice Time" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="2" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="AverageWpmSummaryCard" Grid.Column="2" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel>
                                 <TextBlock Text="{Binding AverageNetWpmText}" FontSize="26" FontWeight="SemiBold" />
                                 <TextBlock Text="Avg Net WPM" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="BestWpmSummaryCard" Grid.Row="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel>
                                 <TextBlock Text="{Binding BestNetWpmText}" FontSize="26" FontWeight="SemiBold" />
                                 <TextBlock Text="Best Net WPM" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Grid.Column="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="AccuracySummaryCard" Grid.Row="1" Grid.Column="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel>
                                 <TextBlock Text="{Binding AccuracyText}" FontSize="26" FontWeight="SemiBold" />
                                 <TextBlock Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Grid.Column="2" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="ErrorsSummaryCard" Grid.Row="1" Grid.Column="2" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel>
                                 <TextBlock Text="{Binding ErrorsText}" FontSize="26" FontWeight="SemiBold" />
                                 <TextBlock Text="Errors" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -401,13 +434,17 @@
                         </Border>
                     </Grid>
 
-                    <Grid ColumnSpacing="16" RowSpacing="16">
+                    <Grid x:Name="QualityBestGrid" ColumnSpacing="16" RowSpacing="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="1.05*" />
                             <ColumnDefinition Width="1*" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="TrainingQualityCard" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel Spacing="12">
                                 <StackPanel Spacing="2">
                                     <TextBlock Text="Training Quality" FontSize="20" FontWeight="SemiBold" />
@@ -439,7 +476,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="PersonalBestsCard" Grid.Column="1" Padding="16" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel Spacing="12">
                                 <StackPanel Spacing="2">
                                     <TextBlock Text="Personal Bests" FontSize="20" FontWeight="SemiBold" />
@@ -451,7 +488,9 @@
                                     SelectionMode="None"
                                     IsItemClickEnabled="True"
                                     ItemClick="PersonalBestListView_ItemClick"
-                                    MaxHeight="330">
+                                    MaxHeight="330"
+                                    ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                    ScrollViewer.HorizontalScrollMode="Enabled">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Grid ColumnSpacing="12" Padding="0,7">
@@ -512,7 +551,7 @@
                         </ItemsControl>
                     </StackPanel>
 
-                    <Grid ColumnSpacing="16" RowSpacing="16">
+                    <Grid x:Name="TrendChartsGrid" ColumnSpacing="16" RowSpacing="16">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -522,7 +561,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Spacing="8">
+                        <StackPanel x:Name="NetWpmChartPanel" Spacing="8">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Net WPM" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="Daily average net words per minute" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -532,7 +571,7 @@
                             </Border>
                         </StackPanel>
 
-                        <StackPanel Grid.Column="1" Spacing="8">
+                        <StackPanel x:Name="AccuracyChartPanel" Grid.Column="1" Spacing="8">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Accuracy" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="Daily keypress accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -542,7 +581,7 @@
                             </Border>
                         </StackPanel>
 
-                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="8">
+                        <StackPanel x:Name="PracticeTimeChartPanel" Grid.Row="1" Grid.ColumnSpan="2" Spacing="8">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Practice Time" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="Daily minutes practiced" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -560,7 +599,12 @@
                                 Text="Grouped by your local calendar date."
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
-                        <ListView ItemsSource="{Binding DailyMetricRows}" SelectionMode="None">
+                        <ListView
+                            x:Name="DailyMetricListView"
+                            ItemsSource="{Binding DailyMetricRows}"
+                            SelectionMode="None"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.HorizontalScrollMode="Enabled">
                             <ListView.Header>
                                 <Grid ColumnSpacing="12" Padding="0,0,0,6">
                                     <Grid.ColumnDefinitions>
@@ -598,7 +642,11 @@
                         </ListView>
                     </StackPanel>
 
-                    <Grid ColumnSpacing="24">
+                    <Grid x:Name="WeakKeyGrid" ColumnSpacing="24" RowSpacing="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
@@ -606,7 +654,12 @@
 
                         <StackPanel Spacing="10">
                             <TextBlock Text="Weakest Keys" FontSize="20" FontWeight="SemiBold" />
-                            <ListView ItemsSource="{Binding WeakestCharacterRows}" SelectionMode="None">
+                            <ListView
+                                x:Name="WeakestCharacterListView"
+                                ItemsSource="{Binding WeakestCharacterRows}"
+                                SelectionMode="None"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.HorizontalScrollMode="Enabled">
                                 <ListView.Header>
                                     <Grid ColumnSpacing="10" Padding="0,0,0,6">
                                         <Grid.ColumnDefinitions>
@@ -646,7 +699,12 @@
 
                         <StackPanel Grid.Column="1" Spacing="10">
                             <TextBlock Text="Slowest Keys" FontSize="20" FontWeight="SemiBold" />
-                            <ListView ItemsSource="{Binding SlowestCharacterRows}" SelectionMode="None">
+                            <ListView
+                                x:Name="SlowestCharacterListView"
+                                ItemsSource="{Binding SlowestCharacterRows}"
+                                SelectionMode="None"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.HorizontalScrollMode="Enabled">
                                 <ListView.Header>
                                     <Grid ColumnSpacing="10" Padding="0,0,0,6">
                                         <Grid.ColumnDefinitions>
@@ -691,7 +749,13 @@
                             <TextBlock Text="Keys ranked by local weakness score from accuracy and latency." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                         <controls:KeyboardHeatmapControl Rows="{Binding HeatmapRows}" />
-                        <ListView ItemsSource="{Binding HeatmapRows}" SelectionMode="None" MaxHeight="260">
+                        <ListView
+                            x:Name="HeatmapListView"
+                            ItemsSource="{Binding HeatmapRows}"
+                            SelectionMode="None"
+                            MaxHeight="260"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.HorizontalScrollMode="Enabled">
                             <ListView.Header>
                                 <Grid ColumnSpacing="10" Padding="0,0,0,6">
                                     <Grid.ColumnDefinitions>
@@ -731,7 +795,13 @@
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
-                            <ListView ItemsSource="{Binding HandFingerRows}" SelectionMode="None" MaxHeight="220">
+                            <ListView
+                                x:Name="HandFingerListView"
+                                ItemsSource="{Binding HandFingerRows}"
+                                SelectionMode="None"
+                                MaxHeight="220"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.HorizontalScrollMode="Enabled">
                                 <ListView.Header>
                                     <Grid ColumnSpacing="10" Padding="0,8,0,6">
                                         <Grid.ColumnDefinitions>
@@ -773,7 +843,11 @@
                             </ListView>
                         </StackPanel>
 
-                    <Grid ColumnSpacing="24">
+                    <Grid x:Name="BigramGrid" ColumnSpacing="24" RowSpacing="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
@@ -781,7 +855,12 @@
 
                         <StackPanel Spacing="10">
                             <TextBlock Text="Weakest Bigrams" FontSize="20" FontWeight="SemiBold" />
-                            <ListView ItemsSource="{Binding WeakestBigramRows}" SelectionMode="None">
+                            <ListView
+                                x:Name="WeakestBigramListView"
+                                ItemsSource="{Binding WeakestBigramRows}"
+                                SelectionMode="None"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.HorizontalScrollMode="Enabled">
                                 <ListView.Header>
                                     <Grid ColumnSpacing="10" Padding="0,0,0,6">
                                         <Grid.ColumnDefinitions>
@@ -821,7 +900,12 @@
 
                         <StackPanel Grid.Column="1" Spacing="10">
                             <TextBlock Text="Slowest Bigrams" FontSize="20" FontWeight="SemiBold" />
-                            <ListView ItemsSource="{Binding SlowestBigramRows}" SelectionMode="None">
+                            <ListView
+                                x:Name="SlowestBigramListView"
+                                ItemsSource="{Binding SlowestBigramRows}"
+                                SelectionMode="None"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.HorizontalScrollMode="Enabled">
                                 <ListView.Header>
                                     <Grid ColumnSpacing="10" Padding="0,0,0,6">
                                         <Grid.ColumnDefinitions>
@@ -862,7 +946,14 @@
 
                     <StackPanel Spacing="10">
                         <TextBlock Text="Recent Sessions" FontSize="20" FontWeight="SemiBold" />
-                        <ListView ItemsSource="{Binding RecentSessionRows}" SelectionMode="None" IsItemClickEnabled="True" ItemClick="RecentSessionsListView_ItemClick">
+                        <ListView
+                            x:Name="RecentSessionsListView"
+                            ItemsSource="{Binding RecentSessionRows}"
+                            SelectionMode="None"
+                            IsItemClickEnabled="True"
+                            ItemClick="RecentSessionsListView_ItemClick"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.HorizontalScrollMode="Enabled">
                             <ListView.Header>
                                 <Grid ColumnSpacing="12" Padding="0,0,0,6">
                                     <Grid.ColumnDefinitions>

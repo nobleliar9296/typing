@@ -386,73 +386,52 @@ public sealed partial class PracticePage : Page
             return;
         }
 
-        var widthScale = width switch
-        {
-            < 720 => 0.70,
-            < 920 => 0.78,
-            < 1200 => 0.88,
-            _ => 1.00
-        };
-        var heightScale = height switch
-        {
-            < 700 => 0.64,
-            < 820 => 0.74,
-            < 980 => 0.86,
-            _ => 1.00
-        };
-        var scale = Math.Clamp(Math.Min(widthScale, heightScale), 0.68, 1.0);
-        var keyboardScale = Math.Clamp(scale * (height < 900 ? 0.94 : 1.0), 0.58, 1.0);
-        var compactHeader = width < 980;
-        var veryCompactHeader = width < 720;
-        var stackedSelectors = width < 760;
+        var metrics = PracticeResponsiveLayoutMetrics.FromViewport(
+            width,
+            height,
+            HeaderGrid.ActualHeight,
+            ViewModel.PracticeStatsVisibility == Visibility.Visible,
+            ViewModel.PracticeTextScale,
+            ViewModel.VisualKeyboardScale,
+            ViewModel.PracticeLineWidthMax);
 
-        var pageHorizontalPadding = Math.Clamp(32 * scale, 16, 32);
-        var pageTopPadding = Math.Clamp(12 * scale, 8, 14);
         PracticeRoot.Padding = new Thickness(0);
-        HeaderGrid.Margin = new Thickness(pageHorizontalPadding, pageTopPadding, pageHorizontalPadding, 0);
-        PracticeContentPanel.Margin = new Thickness(pageHorizontalPadding, 0, pageHorizontalPadding, 0);
-        PracticeContentPanel.Spacing = Math.Clamp(12 * scale, 8, 14);
-        PracticeRoot.RowSpacing = Math.Clamp(10 * scale, 6, 12);
+        HeaderGrid.Margin = new Thickness(metrics.PageHorizontalPadding, metrics.PageTopPadding, metrics.PageHorizontalPadding, 0);
+        PracticeContentPanel.Margin = new Thickness(metrics.PageHorizontalPadding, 0, metrics.PageHorizontalPadding, 0);
+        PracticeContentPanel.Spacing = metrics.ContentSpacing;
+        PracticeRoot.RowSpacing = metrics.RootRowSpacing;
 
-        HeaderGrid.RowSpacing = Math.Clamp(7 * scale, 4, 8);
-        HeaderTopGrid.ColumnSpacing = Math.Clamp(16 * scale, 10, 16);
+        HeaderGrid.RowSpacing = metrics.HeaderRowSpacing;
+        HeaderTopGrid.ColumnSpacing = metrics.HeaderColumnSpacing;
         HeaderTopGrid.RowSpacing = 0;
-        LessonSelectorsPanel.Orientation = stackedSelectors ? Orientation.Vertical : Orientation.Horizontal;
-        LessonSelectorsPanel.Spacing = stackedSelectors ? Math.Clamp(7 * scale, 5, 8) : Math.Clamp(14 * scale, 9, 14);
+        LessonSelectorsPanel.Orientation = metrics.StackedSelectors ? Orientation.Vertical : Orientation.Horizontal;
+        LessonSelectorsPanel.Spacing = metrics.SelectorSpacing;
+        LessonModeComboBox.Width = metrics.LessonModeWidth;
+        LessonSizeComboBox.Width = metrics.LessonSizeWidth;
+        ClipboardLessonButton.Content = metrics.UseShortClipboardText ? "Copied text" : "Practice copied text";
+        ClipboardLessonButton.Padding = new Thickness(
+            metrics.ClipboardPaddingHorizontal,
+            metrics.ClipboardPaddingVertical,
+            metrics.ClipboardPaddingHorizontal,
+            metrics.ClipboardPaddingVertical);
 
-        ArrangeHeaderTop(stackedSelectors);
-        ArrangeContext(compactHeader, veryCompactHeader);
-        ArrangeStatsColumns(width, scale);
-        SetHeaderTypography(scale);
-        SetKpiTileSizing(scale);
+        ArrangeHeaderTop(metrics.StackedSelectors);
+        ArrangeContext(metrics.CompactHeader, metrics.VeryCompactHeader);
+        ArrangeStatsColumns(metrics);
+        SetHeaderTypography(metrics);
+        SetKpiTileSizing(metrics);
 
-        var inputHorizontalPadding = Math.Clamp(28 * scale, 14, 28);
-        var inputTopPadding = Math.Clamp(24 * scale, 12, 24);
-        InputBorder.Padding = new Thickness(inputHorizontalPadding, inputTopPadding, inputHorizontalPadding, 0);
-        InputBorder.MaxWidth = width < 1200 ? double.PositiveInfinity : 1100;
-        PracticeTextPresenter.DisplayScale = scale * ViewModel.PracticeTextScale;
-        PracticeTextPresenter.MaxWidth = ViewModel.PracticeLineWidthMax;
-        VisualKeyboard.KeyboardScale = keyboardScale * ViewModel.VisualKeyboardScale;
-        VisualKeyboard.MaxWidth = width < 900 ? double.PositiveInfinity : 1280;
+        InputBorder.Padding = new Thickness(metrics.InputHorizontalPadding, metrics.InputTopPadding, metrics.InputHorizontalPadding, 0);
+        InputBorder.MaxWidth = metrics.InputBorderMaxWidth;
+        PracticeTextPresenter.DisplayScale = metrics.PracticeTextDisplayScale;
+        PracticeTextPresenter.MaxWidth = metrics.PracticeTextMaxWidth;
+        PracticeTextPresenter.RefreshLayout();
+        VisualKeyboard.KeyboardScale = metrics.KeyboardScale;
+        VisualKeyboard.MaxWidth = metrics.KeyboardMaxWidth;
+        ArrangeReviewPopup(metrics);
 
-        var headerHeight = HeaderGrid.ActualHeight > 0
-            ? HeaderGrid.ActualHeight
-            : compactHeader ? 92 * scale : 58 * scale;
-        var keyboardHeightEstimate = (306 * keyboardScale) + 18;
-        var statusAllowance = 34 * scale;
-        var availableTextHeight = height
-            - HeaderGrid.Margin.Top
-            - PracticeRoot.RowSpacing
-            - headerHeight
-            - keyboardHeightEstimate
-            - statusAllowance;
-        var fourLineTextHeight = 4 * 48 * PracticeTextPresenter.DisplayScale;
-        var maxTextHeight = Math.Clamp(
-            availableTextHeight,
-            fourLineTextHeight,
-            Math.Max(fourLineTextHeight, height < 900 ? 300 : 360));
-        PracticeTextScrollViewer.MaxHeight = maxTextHeight;
-        PracticeTextScrollViewer.MinHeight = Math.Min(maxTextHeight, fourLineTextHeight);
+        PracticeTextScrollViewer.MaxHeight = metrics.PracticeTextMaxHeight;
+        PracticeTextScrollViewer.MinHeight = metrics.PracticeTextMinHeight;
     }
 
     private void ArrangeHeaderTop(bool stackedSelectors)
@@ -516,42 +495,90 @@ public sealed partial class PracticePage : Page
         Grid.SetColumnSpan(element, columnSpan);
     }
 
-    private void ArrangeStatsColumns(double width, double scale)
+    private void ArrangeStatsColumns(PracticeResponsiveLayoutMetrics metrics)
     {
-        var minimumRailWidth = width < 820 ? 92 : 108;
-        var statsWidth = Math.Clamp(132 * scale, minimumRailWidth, 132);
-        LeftStatsColumn.Width = new GridLength(statsWidth);
-        RightStatsColumn.Width = new GridLength(statsWidth);
-        PracticeTypingGrid.ColumnSpacing = Math.Clamp(12 * scale, 8, 14);
-        LeftStatsPanel.Spacing = Math.Clamp(8 * scale, 5, 8);
-        RightStatsPanel.Spacing = Math.Clamp(8 * scale, 5, 8);
+        if (metrics.CompactStats)
+        {
+            LeftStatsColumn.Width = new GridLength(0);
+            TextColumn.Width = new GridLength(1, GridUnitType.Star);
+            RightStatsColumn.Width = new GridLength(0);
+            PracticeTypingGrid.ColumnSpacing = 0;
+            PracticeTypingGrid.RowSpacing = metrics.CompactStatsRowSpacing;
+            ArrangeStatPanel(LeftStatsPanel, row: 0, column: 0, columnSpan: 3, Orientation.Horizontal, HorizontalAlignment.Left);
+            ArrangeTypingSurface(row: 1, column: 0, columnSpan: 3);
+            ArrangeStatPanel(RightStatsPanel, row: 2, column: 0, columnSpan: 3, Orientation.Horizontal, HorizontalAlignment.Left);
+            LeftStatsPanel.Spacing = metrics.StatsPanelSpacing;
+            RightStatsPanel.Spacing = metrics.StatsPanelSpacing;
+            return;
+        }
+
+        LeftStatsColumn.Width = new GridLength(metrics.RailStatsWidth);
+        TextColumn.Width = new GridLength(1, GridUnitType.Star);
+        RightStatsColumn.Width = new GridLength(metrics.RailStatsWidth);
+        PracticeTypingGrid.ColumnSpacing = metrics.TypingGridColumnSpacing;
+        PracticeTypingGrid.RowSpacing = 0;
+        ArrangeStatPanel(LeftStatsPanel, row: 0, column: 0, columnSpan: 1, Orientation.Vertical, HorizontalAlignment.Stretch);
+        ArrangeTypingSurface(row: 0, column: 1, columnSpan: 1);
+        ArrangeStatPanel(RightStatsPanel, row: 0, column: 2, columnSpan: 1, Orientation.Vertical, HorizontalAlignment.Stretch);
+        LeftStatsPanel.Spacing = metrics.StatsPanelSpacing;
+        RightStatsPanel.Spacing = metrics.StatsPanelSpacing;
     }
 
-    private void SetHeaderTypography(double scale)
+    private static void ArrangeStatPanel(StackPanel panel, int row, int column, int columnSpan, Orientation orientation, HorizontalAlignment horizontalAlignment)
     {
-        LessonReasonText.FontSize = Math.Clamp(14 * scale, 12, 14);
-        FocusKeysText.FontSize = Math.Clamp(14 * scale, 12, 14);
-        FocusBigramsText.FontSize = Math.Clamp(14 * scale, 12, 14);
-        LessonContentText.FontSize = Math.Clamp(14 * scale, 12, 14);
+        panel.Orientation = orientation;
+        panel.HorizontalAlignment = horizontalAlignment;
+        Grid.SetRow(panel, row);
+        Grid.SetColumn(panel, column);
+        Grid.SetColumnSpan(panel, columnSpan);
+    }
+
+    private void ArrangeTypingSurface(int row, int column, int columnSpan)
+    {
+        Grid.SetRow(InputSurface, row);
+        Grid.SetColumn(InputSurface, column);
+        Grid.SetColumnSpan(InputSurface, columnSpan);
+    }
+
+    private void SetHeaderTypography(PracticeResponsiveLayoutMetrics metrics)
+    {
+        LessonReasonText.FontSize = metrics.MetadataFontSize;
+        FocusKeysText.FontSize = metrics.MetadataFontSize;
+        FocusBigramsText.FontSize = metrics.MetadataFontSize;
+        LessonContentText.FontSize = metrics.MetadataFontSize;
 
         foreach (var valueText in new[] { RawWpmValueText, NetWpmValueText, AccuracyValueText, ElapsedValueText, ErrorsValueText, ProgressValueText })
         {
-            valueText.FontSize = Math.Clamp(24 * scale, 18, 24);
+            valueText.FontSize = metrics.KpiValueFontSize;
         }
 
         foreach (var labelText in new[] { RawWpmLabelText, NetWpmLabelText, AccuracyLabelText, ElapsedLabelText, ErrorsLabelText, ProgressLabelText, CharactersText })
         {
-            labelText.FontSize = Math.Clamp(11 * scale, 9, 11);
+            labelText.FontSize = metrics.KpiLabelFontSize;
         }
     }
 
-    private void SetKpiTileSizing(double scale)
+    private void SetKpiTileSizing(PracticeResponsiveLayoutMetrics metrics)
     {
         foreach (var tile in new[] { RawWpmTile, NetWpmTile, AccuracyTile, ElapsedTile, ErrorsTile, ProgressTile })
         {
-            tile.Padding = new Thickness(Math.Clamp(10 * scale, 6, 10), Math.Clamp(8 * scale, 5, 8), Math.Clamp(10 * scale, 6, 10), Math.Clamp(8 * scale, 5, 8));
-            tile.MinHeight = Math.Clamp(58 * scale, 48, 58);
+            tile.Padding = new Thickness(
+                metrics.KpiTilePaddingHorizontal,
+                metrics.KpiTilePaddingVertical,
+                metrics.KpiTilePaddingHorizontal,
+                metrics.KpiTilePaddingVertical);
+            tile.MinHeight = metrics.KpiTileMinHeight;
+            tile.MinWidth = metrics.KpiTileWidth.HasValue ? 96 : 0;
+            tile.Width = metrics.KpiTileWidth ?? double.NaN;
         }
+    }
+
+    private void ArrangeReviewPopup(PracticeResponsiveLayoutMetrics metrics)
+    {
+        ReviewDialogBorder.Margin = new Thickness(metrics.ReviewMargin);
+        ReviewDialogBorder.Padding = new Thickness(metrics.ReviewPadding);
+        ReviewDialogBorder.MaxWidth = metrics.ReviewMaxWidth;
+        ReviewScrollViewer.MaxHeight = metrics.ReviewMaxHeight;
     }
 
     private bool NavigateTo(Type pageType, object? parameter = null)

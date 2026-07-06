@@ -3,16 +3,17 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:TypingTrainer.App.Controls"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+    SizeChanged="SessionDetailPage_SizeChanged">
 
-    <Grid RowSpacing="24">
+    <Grid x:Name="SessionDetailRootGrid" RowSpacing="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="0" Margin="32,24,32,24">
-            <StackPanel Spacing="22">
-                <StackPanel Spacing="4">
+        <ScrollViewer x:Name="SessionDetailScrollViewer" Grid.Row="0" Margin="32,24,32,24">
+            <StackPanel x:Name="SessionDetailContentPanel" Spacing="22">
+                <StackPanel x:Name="SessionDetailHeaderPanel" Spacing="4">
                     <TextBlock Text="{Binding Title}" FontSize="28" FontWeight="SemiBold" />
                     <TextBlock Text="Local session drill-down" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
@@ -20,7 +21,14 @@
                 <ProgressRing Width="32" Height="32" HorizontalAlignment="Left" IsActive="{Binding IsLoading}" Visibility="{Binding LoadingVisibility}" />
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Visibility="{Binding ErrorVisibility}" />
 
-                <Grid ColumnSpacing="12">
+                <Grid x:Name="SessionSummaryGrid" ColumnSpacing="12" RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
@@ -28,31 +36,31 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Border Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                    <Border x:Name="NetWpmSummaryCard" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                         <StackPanel>
                             <TextBlock Text="{Binding NetWpmText}" FontSize="24" FontWeight="SemiBold" />
                             <TextBlock Text="Net WPM" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                     </Border>
-                    <Border Grid.Column="1" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                    <Border x:Name="AccuracySummaryCard" Grid.Column="1" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                         <StackPanel>
                             <TextBlock Text="{Binding AccuracyText}" FontSize="24" FontWeight="SemiBold" />
                             <TextBlock Text="Accuracy" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                     </Border>
-                    <Border Grid.Column="2" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                    <Border x:Name="DurationSummaryCard" Grid.Column="2" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                         <StackPanel>
                             <TextBlock Text="{Binding DurationText}" FontSize="24" FontWeight="SemiBold" />
                             <TextBlock Text="Duration" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                     </Border>
-                    <Border Grid.Column="3" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                    <Border x:Name="MistakesSummaryCard" Grid.Column="3" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                         <StackPanel>
                             <TextBlock Text="{Binding MistakesText}" FontSize="24" FontWeight="SemiBold" />
                             <TextBlock Text="Mistakes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                     </Border>
-                    <Border Grid.Column="4" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                    <Border x:Name="QualitySummaryCard" Grid.Column="4" Padding="14" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                         <StackPanel>
                             <TextBlock Text="{Binding QualityScoreText}" FontSize="24" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding QualityGradeText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -66,18 +74,22 @@
                         <TextBlock Text="{Binding QualityExplanationText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                         <TextBlock Text="Dips can point to fatigue, pauses, or mistake clusters during the session." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                     </StackPanel>
-                    <Grid ColumnSpacing="18">
+                    <Grid x:Name="ConsistencyChartsGrid" ColumnSpacing="18" RowSpacing="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border Padding="12" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="SessionNetWpmChartCard" Padding="12" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel Spacing="6">
                                 <TextBlock Text="Net WPM over session" FontWeight="SemiBold" />
                                 <controls:TrendLineChart Points="{Binding TimelineNetWpmPoints}" ValueSuffix=" WPM" />
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="1" Padding="12" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
+                        <Border x:Name="SessionAccuracyChartCard" Grid.Column="1" Padding="12" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" CornerRadius="8">
                             <StackPanel Spacing="6">
                                 <TextBlock Text="Accuracy over session" FontWeight="SemiBold" />
                                 <controls:TrendLineChart Points="{Binding TimelineAccuracyPoints}" ValueSuffix="%" MaximumValue="100" />
@@ -86,14 +98,24 @@
                     </Grid>
                 </StackPanel>
 
-                <Grid ColumnSpacing="18">
+                <Grid x:Name="TimelineMistakesGrid" ColumnSpacing="18" RowSpacing="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="10">
                         <TextBlock Text="Timeline Samples" FontSize="20" FontWeight="SemiBold" />
-                        <ListView ItemsSource="{Binding TimelineRows}" SelectionMode="None" MaxHeight="260">
+                        <ListView
+                            x:Name="TimelineListView"
+                            ItemsSource="{Binding TimelineRows}"
+                            SelectionMode="None"
+                            MaxHeight="260"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.HorizontalScrollMode="Enabled">
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Grid ColumnSpacing="12" Padding="0,7">
@@ -113,7 +135,13 @@
 
                     <StackPanel Grid.Column="1" Spacing="10">
                         <TextBlock Text="Mistakes" FontSize="20" FontWeight="SemiBold" />
-                        <ListView ItemsSource="{Binding MistakeRows}" SelectionMode="None" MaxHeight="260">
+                        <ListView
+                            x:Name="MistakesListView"
+                            ItemsSource="{Binding MistakeRows}"
+                            SelectionMode="None"
+                            MaxHeight="260"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.HorizontalScrollMode="Enabled">
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Grid ColumnSpacing="10" Padding="0,7">
@@ -134,7 +162,11 @@
                     </StackPanel>
                 </Grid>
 
-                <Grid ColumnSpacing="18">
+                <Grid x:Name="SlowestListsGrid" ColumnSpacing="18" RowSpacing="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
@@ -149,7 +181,7 @@
                     </StackPanel>
                 </Grid>
 
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <StackPanel x:Name="SessionDetailActionsPanel" Orientation="Horizontal" Spacing="8">
                     <Button Content="Back to Dashboard" Click="BackButton_Click" />
                     <Button Content="Replay Mistakes" Click="ReplayMistakesButton_Click" />
                 </StackPanel>

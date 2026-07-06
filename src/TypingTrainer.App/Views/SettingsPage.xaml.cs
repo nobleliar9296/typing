@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using TypingTrainer.App.Services;
 using TypingTrainer.App.ViewModels;
 using TypingTrainer.Data.Models;
@@ -95,6 +96,12 @@ public sealed partial class SettingsPage : Page
             _ => 0
         };
         _isLoaded = true;
+        ApplyResponsiveLayout(ActualWidth, ActualHeight);
+    }
+
+    private void SettingsPage_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ApplyResponsiveLayout(e.NewSize.Width, e.NewSize.Height);
     }
 
     private void DefaultLessonModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -328,5 +335,150 @@ public sealed partial class SettingsPage : Page
             ViewModel.SetImportStatus,
             fallbackFailureStatus,
             logSource);
+    }
+
+    private void ApplyResponsiveLayout(double width, double height)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        var metrics = AppResponsiveLayoutMetrics.FromViewport(width, height);
+        var compact = metrics.CompactWidth;
+        var narrow = metrics.NarrowWidth;
+        var cardPadding = new Thickness(metrics.CardPadding);
+
+        SettingsRootGrid.RowSpacing = metrics.RootRowSpacing;
+        SettingsHeaderPanel.Margin = new Thickness(
+            metrics.PageHorizontalPadding,
+            metrics.PageTopPadding,
+            metrics.PageHorizontalPadding,
+            0);
+        SettingsScrollViewer.Margin = new Thickness(
+            metrics.PageHorizontalPadding,
+            0,
+            metrics.PageHorizontalPadding,
+            metrics.PageBottomPadding);
+        SettingsContentPanel.Spacing = metrics.CardSpacing;
+        SettingsContentPanel.MaxWidth = metrics.MaxContentWidth;
+
+        SettingsStatusCard.Padding = new Thickness(Math.Clamp(12 * metrics.Scale, 8, 12));
+        SettingsSectionsGrid.ColumnSpacing = compact ? 0 : metrics.CardSpacing;
+        SettingsSectionsGrid.RowSpacing = metrics.CardSpacing;
+        SettingsPrimaryColumn.Width = new GridLength(1, GridUnitType.Star);
+        SettingsSecondaryColumn.Width = compact ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+
+        PositionSettingsCards(compact);
+
+        TypingSettingsCard.Padding = cardPadding;
+        PracticeDisplayCard.Padding = cardPadding;
+        ContentSettingsCard.Padding = cardPadding;
+        DataSettingsCard.Padding = cardPadding;
+
+        TypingSettingsGrid.ColumnSpacing = Math.Clamp(14 * metrics.Scale, 8, 14);
+        TypingSettingsGrid.RowSpacing = Math.Clamp(12 * metrics.Scale, 8, 12);
+        TypingSettingsLabelColumn.Width = new GridLength(metrics.FormLabelWidth);
+        DefaultLessonModeComboBox.Width = metrics.FormControlWidth;
+        TrainingFocusComboBox.Width = metrics.FormControlWidth;
+        LessonLengthNumberBox.Width = metrics.CompactFormControlWidth;
+        SessionMinutesNumberBox.Width = metrics.CompactFormControlWidth;
+        EssayWordsNumberBox.Width = metrics.CompactFormControlWidth;
+
+        DisplaySettingsGrid.ColumnSpacing = Math.Clamp(12 * metrics.Scale, 8, 12);
+        DisplaySettingsGrid.RowSpacing = Math.Clamp(12 * metrics.Scale, 8, 12);
+        DisplaySettingsLabelColumn.Width = new GridLength(Math.Min(150, metrics.FormLabelWidth));
+        PracticeTextContrastTextBox.Width = metrics.CompactFormControlWidth;
+        CursorStyleComboBox.Width = metrics.FilterControlWidth;
+        ThemePresetComboBox.Width = metrics.FilterControlWidth;
+        DifficultyPresetComboBox.Width = metrics.FilterControlWidth;
+
+        var verticalOptions = metrics.VeryNarrowWidth;
+        SoundOptionsPanel.Orientation = verticalOptions ? Orientation.Vertical : Orientation.Horizontal;
+        FingerOptionsPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+        ContrastCursorPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+        ThemePanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+        ImportActionButtonsPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+        DifficultyPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+        ContentSourcePanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+        AllowedCharactersPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+        ExportButtonsPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+        BackupButtonsPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+
+        ContentPacksListView.MaxHeight = metrics.TableMaxHeight;
+        ContentPreviewListView.MaxHeight = metrics.ShortHeight ? 140 : 180;
+
+        ApplyStatusLayout(narrow);
+        ApplyImportLayout(narrow);
+    }
+
+    private void PositionSettingsCards(bool compact)
+    {
+        if (compact)
+        {
+            Grid.SetRow(TypingSettingsCard, 0);
+            Grid.SetColumn(TypingSettingsCard, 0);
+            Grid.SetRow(PracticeDisplayCard, 1);
+            Grid.SetColumn(PracticeDisplayCard, 0);
+            Grid.SetRow(ContentSettingsCard, 2);
+            Grid.SetColumn(ContentSettingsCard, 0);
+            Grid.SetRow(DataSettingsCard, 3);
+            Grid.SetColumn(DataSettingsCard, 0);
+        }
+        else
+        {
+            Grid.SetRow(TypingSettingsCard, 0);
+            Grid.SetColumn(TypingSettingsCard, 0);
+            Grid.SetRow(PracticeDisplayCard, 0);
+            Grid.SetColumn(PracticeDisplayCard, 1);
+            Grid.SetRow(ContentSettingsCard, 1);
+            Grid.SetColumn(ContentSettingsCard, 0);
+            Grid.SetRow(DataSettingsCard, 1);
+            Grid.SetColumn(DataSettingsCard, 1);
+        }
+    }
+
+    private void ApplyStatusLayout(bool narrow)
+    {
+        if (narrow)
+        {
+            SettingsStatusInfoColumn.Width = new GridLength(1, GridUnitType.Star);
+            SettingsStatusTextColumn.Width = new GridLength(1, GridUnitType.Star);
+            Grid.SetRow(SettingsStatusTextBlock, 1);
+            Grid.SetColumn(SettingsStatusTextBlock, 0);
+        }
+        else
+        {
+            SettingsStatusInfoColumn.Width = new GridLength(1, GridUnitType.Star);
+            SettingsStatusTextColumn.Width = GridLength.Auto;
+            Grid.SetRow(SettingsStatusTextBlock, 0);
+            Grid.SetColumn(SettingsStatusTextBlock, 1);
+        }
+    }
+
+    private void ApplyImportLayout(bool narrow)
+    {
+        if (narrow)
+        {
+            Grid.SetRow(BrowseImportButton, 1);
+            Grid.SetColumn(BrowseImportButton, 0);
+            BrowseImportButton.HorizontalAlignment = HorizontalAlignment.Left;
+
+            ImportPreviewOriginalColumn.Width = new GridLength(1, GridUnitType.Star);
+            ImportPreviewCleanedColumn.Width = new GridLength(0);
+            Grid.SetRow(ImportCleanedPreviewTextBox, 1);
+            Grid.SetColumn(ImportCleanedPreviewTextBox, 0);
+        }
+        else
+        {
+            Grid.SetRow(BrowseImportButton, 0);
+            Grid.SetColumn(BrowseImportButton, 1);
+            BrowseImportButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+
+            ImportPreviewOriginalColumn.Width = new GridLength(1, GridUnitType.Star);
+            ImportPreviewCleanedColumn.Width = new GridLength(1, GridUnitType.Star);
+            Grid.SetRow(ImportCleanedPreviewTextBox, 0);
+            Grid.SetColumn(ImportCleanedPreviewTextBox, 1);
+        }
     }
 }

@@ -13,6 +13,9 @@ namespace TypingTrainer.App.Controls;
 
 public sealed class PracticeTextPresenter : UserControl
 {
+    internal const char VisibleSpaceCharacter = '\u00B7';
+    internal const string VisibleEnterText = "\u21B5\n";
+
     public static readonly DependencyProperty StateProperty = DependencyProperty.Register(
         nameof(State),
         typeof(TypingStateSnapshot),
@@ -134,6 +137,12 @@ public sealed class PracticeTextPresenter : UserControl
         return GetEstimatedCursorBounds().Y;
     }
 
+    public void RefreshLayout()
+    {
+        _layoutSnapshot = null;
+        Render();
+    }
+
     private static void OnStateChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
     {
         if (dependencyObject is PracticeTextPresenter presenter)
@@ -205,7 +214,7 @@ public sealed class PracticeTextPresenter : UserControl
             }
 
             activeState = visualState;
-            textBuilder.Append(GetDisplayChar(character));
+            textBuilder.Append(GetDisplayText(character, ShowSpaceDots));
         }
 
         FlushRun(textBuilder, activeState);
@@ -307,37 +316,45 @@ public sealed class PracticeTextPresenter : UserControl
         var lineHeight = 48 * scale;
         var columnCapacity = GetColumnCapacity(characterWidth);
         return new PracticeTextLayoutSnapshot(
-            BuildCharacterLayout(columnCapacity),
+            BuildCharacterLayout(State?.Characters, columnCapacity),
             characterWidth,
             lineHeight,
             columnCapacity);
     }
 
-    private CharacterLayoutPosition[] BuildCharacterLayout(int maxColumns)
+    internal static CharacterLayoutPosition[] BuildCharacterLayout(IReadOnlyList<CharacterSnapshot>? characters, int maxColumns)
     {
-        if (State is null || State.Characters.Count == 0)
+        if (characters is null || characters.Count == 0)
         {
             return [];
         }
 
-        var layout = new CharacterLayoutPosition[State.Characters.Count];
+        maxColumns = Math.Max(1, maxColumns);
+
+        var layout = new CharacterLayoutPosition[characters.Count];
         var line = 0;
         var start = 0;
 
-        while (start < State.Characters.Count)
+        while (start < characters.Count)
         {
-            if (State.Characters[start].ExpectedChar == '\n')
+            var lineEnd = FindLineEnd(characters, start, maxColumns);
+
+            if (lineEnd < characters.Count && characters[lineEnd].ExpectedChar == '\n')
             {
-                layout[start] = new CharacterLayoutPosition(line, 0);
+                for (var index = start; index < lineEnd; index++)
+                {
+                    layout[index] = new CharacterLayoutPosition(line, index - start);
+                }
+
+                layout[lineEnd] = new CharacterLayoutPosition(line, lineEnd - start);
                 line++;
-                start++;
+                start = lineEnd + 1;
                 continue;
             }
 
-            var lineEnd = FindLineEnd(start, maxColumns);
             if (lineEnd <= start)
             {
-                lineEnd = Math.Min(start + 1, State.Characters.Count);
+                lineEnd = Math.Min(start + 1, characters.Count);
             }
 
             for (var index = start; index < lineEnd; index++)
@@ -346,7 +363,7 @@ public sealed class PracticeTextPresenter : UserControl
             }
 
             start = lineEnd;
-            if (start < State.Characters.Count && State.Characters[start].ExpectedChar != '\n')
+            if (start < characters.Count)
             {
                 line++;
             }
@@ -355,21 +372,21 @@ public sealed class PracticeTextPresenter : UserControl
         return layout;
     }
 
-    private int FindLineEnd(int start, int maxColumns)
+    private static int FindLineEnd(IReadOnlyList<CharacterSnapshot> characters, int start, int maxColumns)
     {
-        if (State is null)
-        {
-            return start;
-        }
-
-        var count = State.Characters.Count;
+        var count = characters.Count;
         var hardLimit = Math.Min(start + maxColumns, count);
         for (var index = start; index < hardLimit; index++)
         {
-            if (State.Characters[index].ExpectedChar == '\n')
+            if (characters[index].ExpectedChar == '\n')
             {
                 return index;
             }
+        }
+
+        if (hardLimit < count && characters[hardLimit].ExpectedChar == '\n')
+        {
+            return hardLimit;
         }
 
         if (hardLimit >= count)
@@ -380,7 +397,7 @@ public sealed class PracticeTextPresenter : UserControl
         var lastSpace = -1;
         for (var index = start; index < hardLimit; index++)
         {
-            if (State.Characters[index].ExpectedChar == ' ')
+            if (characters[index].ExpectedChar == ' ')
             {
                 lastSpace = index;
             }
@@ -409,17 +426,21 @@ public sealed class PracticeTextPresenter : UserControl
 
     private double GetAvailableTextWidth()
     {
+        var constrainedMaxWidth = double.IsFinite(MaxWidth) && MaxWidth > 1
+            ? MaxWidth
+            : (double?)null;
+
         if (ActualWidth > 1)
         {
-            return ActualWidth;
+            return constrainedMaxWidth.HasValue ? Math.Min(ActualWidth, constrainedMaxWidth.Value) : ActualWidth;
         }
 
         if (_textBlock.ActualWidth > 1)
         {
-            return _textBlock.ActualWidth;
+            return constrainedMaxWidth.HasValue ? Math.Min(_textBlock.ActualWidth, constrainedMaxWidth.Value) : _textBlock.ActualWidth;
         }
 
-        return double.IsFinite(MaxWidth) && MaxWidth > 1 ? MaxWidth : 1040;
+        return constrainedMaxWidth ?? 1040;
     }
 
     private Windows.Foundation.Rect CreateCursorShape(Windows.Foundation.Rect characterBounds, string style)
@@ -528,11 +549,20 @@ public sealed class PracticeTextPresenter : UserControl
         storyboard.Children.Add(animation);
     }
 
-    private char GetDisplayChar(CharacterSnapshot character)
+    internal static string GetDisplayText(CharacterSnapshot character, bool showSpaceDots)
     {
-        return ShowSpaceDots && character.ExpectedChar == ' '
-            ? '\u00B7'
-            : character.ExpectedChar;
+        return character.ExpectedChar switch
+        {
+            '\n' => VisibleEnterText,
+            ' ' when showSpaceDots || ShouldForceVisibleSpace(character) => VisibleSpaceCharacter.ToString(),
+            _ => character.ExpectedChar.ToString()
+        };
+    }
+
+    private static bool ShouldForceVisibleSpace(CharacterSnapshot character)
+    {
+        return character.State is CharacterState.Current or CharacterState.Incorrect
+            || character.State == CharacterState.Correct && character.HadIncorrectInput;
     }
 
     private static VisualCharacterState GetVisualState(CharacterSnapshot character)
@@ -596,7 +626,7 @@ public sealed class PracticeTextPresenter : UserControl
         Incorrect
     }
 
-    private readonly record struct CharacterLayoutPosition(int Line, int Column);
+    internal readonly record struct CharacterLayoutPosition(int Line, int Column);
 
     private sealed record PracticeTextLayoutSnapshot(
         CharacterLayoutPosition[] Layout,

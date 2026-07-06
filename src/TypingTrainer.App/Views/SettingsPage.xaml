@@ -3,55 +3,62 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-    Loaded="SettingsPage_Loaded">
+    Loaded="SettingsPage_Loaded"
+    SizeChanged="SettingsPage_SizeChanged">
 
-    <Grid RowSpacing="24">
+    <Grid x:Name="SettingsRootGrid" RowSpacing="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="32,24,32,0" Spacing="3">
+        <StackPanel x:Name="SettingsHeaderPanel" Grid.Row="0" Margin="32,24,32,0" Spacing="3">
             <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" />
             <TextBlock
                 Text="Local typing, content, visual keyboard, and data preferences"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1" Margin="32,0,32,24">
-            <StackPanel Spacing="18" MaxWidth="1040">
-                <Border Padding="12" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
-                    <Grid ColumnSpacing="12">
+        <ScrollViewer x:Name="SettingsScrollViewer" Grid.Row="1" Margin="32,0,32,24">
+            <StackPanel x:Name="SettingsContentPanel" Spacing="18" MaxWidth="1040">
+                <Border x:Name="SettingsStatusCard" Padding="12" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6">
+                    <Grid x:Name="SettingsStatusGrid" ColumnSpacing="12" RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition x:Name="SettingsStatusInfoColumn" Width="*" />
+                            <ColumnDefinition x:Name="SettingsStatusTextColumn" Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Spacing="2">
                             <TextBlock Text="Preferences autosave locally" FontWeight="SemiBold" />
                             <TextBlock Text="Changes are written to the local SQLite settings store after a short pause." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
-                        <TextBlock Grid.Column="1" Text="{Binding SettingsStatus}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="SettingsStatusTextBlock" Grid.Column="1" Text="{Binding SettingsStatus}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </Grid>
                 </Border>
 
-                <Grid ColumnSpacing="18" RowSpacing="18">
+                <Grid x:Name="SettingsSectionsGrid" ColumnSpacing="18" RowSpacing="18">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition x:Name="SettingsPrimaryColumn" Width="*" />
+                        <ColumnDefinition x:Name="SettingsSecondaryColumn" Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Padding="18" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+                    <Border x:Name="TypingSettingsCard" Padding="18" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
                         <StackPanel Spacing="14">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Typing" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="Lesson behavior and completion saving." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
 
-                            <Grid ColumnSpacing="14" RowSpacing="12">
+                            <Grid x:Name="TypingSettingsGrid" ColumnSpacing="14" RowSpacing="12">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
@@ -63,7 +70,7 @@
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition x:Name="TypingSettingsLabelColumn" Width="180" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
@@ -86,6 +93,7 @@
 
                                 <TextBlock Grid.Row="1" Text="Lesson length" VerticalAlignment="Center" />
                                 <NumberBox
+                                    x:Name="LessonLengthNumberBox"
                                     Grid.Row="1"
                                     Grid.Column="1"
                                     Width="160"
@@ -124,6 +132,7 @@
 
                                 <TextBlock Grid.Row="6" Text="Session minutes" VerticalAlignment="Center" />
                                 <NumberBox
+                                    x:Name="SessionMinutesNumberBox"
                                     Grid.Row="6"
                                     Grid.Column="1"
                                     Width="120"
@@ -134,6 +143,7 @@
 
                                 <TextBlock Grid.Row="7" Text="Essay words" VerticalAlignment="Center" />
                                 <NumberBox
+                                    x:Name="EssayWordsNumberBox"
                                     Grid.Row="7"
                                     Grid.Column="1"
                                     Width="120"
@@ -145,7 +155,7 @@
 
                             <StackPanel Spacing="8">
                                 <CheckBox Content="Zen Mode during practice" IsChecked="{Binding ZenModeEnabled, Mode=TwoWay}" />
-                                <Grid ColumnSpacing="10">
+                                <Grid x:Name="CountdownGrid" ColumnSpacing="10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="160" />
@@ -155,7 +165,7 @@
                                     <Slider Grid.Column="1" Minimum="0" Maximum="3" StepFrequency="1" Value="{Binding CountdownSeconds, Mode=TwoWay}" />
                                     <TextBlock Grid.Column="2" Text="{Binding CountdownText}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </Grid>
-                                <StackPanel Orientation="Horizontal" Spacing="18">
+                                <StackPanel x:Name="SoundOptionsPanel" Orientation="Horizontal" Spacing="18">
                                     <CheckBox Content="Key sounds" IsChecked="{Binding KeySoundEnabled, Mode=TwoWay}" />
                                     <CheckBox Content="Mistake sounds" IsChecked="{Binding MistakeSoundEnabled, Mode=TwoWay}" />
                                 </StackPanel>
@@ -163,14 +173,14 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="1" Padding="18" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+                    <Border x:Name="PracticeDisplayCard" Grid.Column="1" Padding="18" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
                         <StackPanel Spacing="14">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Practice Display" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="Adjust the active practice surface." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
 
-                            <Grid ColumnSpacing="12" RowSpacing="12">
+                            <Grid x:Name="DisplaySettingsGrid" ColumnSpacing="12" RowSpacing="12">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
@@ -181,7 +191,7 @@
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition x:Name="DisplaySettingsLabelColumn" Width="150" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="92" />
                                     <ColumnDefinition Width="58" />
@@ -201,7 +211,7 @@
                                     <CheckBox Content="Show visual keyboard" IsChecked="{Binding ShowVisualKeyboard, Mode=TwoWay}" />
                                     <CheckBox Content="Show dots for spaces" IsChecked="{Binding ShowSpaceDots, Mode=TwoWay}" />
                                 </StackPanel>
-                                <StackPanel Grid.Row="3" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="18">
+                                <StackPanel x:Name="FingerOptionsPanel" Grid.Row="3" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="18">
                                     <CheckBox Content="Show finger colors" IsChecked="{Binding ShowFingerColors, Mode=TwoWay}" />
                                     <CheckBox Content="Show finger labels" IsChecked="{Binding ShowFingerLabels, Mode=TwoWay}" />
                                 </StackPanel>
@@ -223,8 +233,8 @@
                                 <TextBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding PracticeLineWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                                 <TextBlock Grid.Row="6" Text="Contrast / cursor" VerticalAlignment="Center" />
-                                <StackPanel Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="8">
-                                    <TextBox Width="140" Text="{Binding PracticeTextContrast, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <StackPanel x:Name="ContrastCursorPanel" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="8">
+                                    <TextBox x:Name="PracticeTextContrastTextBox" Width="140" Text="{Binding PracticeTextContrast, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     <ComboBox
                                         x:Name="CursorStyleComboBox"
                                         Width="150"
@@ -237,7 +247,7 @@
                                 </StackPanel>
                             </Grid>
 
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel x:Name="ThemePanel" Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="Theme" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <ComboBox
                                     x:Name="ThemePresetComboBox"
@@ -256,25 +266,29 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="1" Padding="18" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+                    <Border x:Name="ContentSettingsCard" Grid.Row="1" Padding="18" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
                         <StackPanel Spacing="14">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Content" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="Only import text you wrote, own, or have permission to use." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
 
-                            <Grid ColumnSpacing="8">
+                            <Grid x:Name="ImportFileGrid" ColumnSpacing="8" RowSpacing="8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBox Header="TXT file path" Text="{Binding ImportFilePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="1" Content="Browse" VerticalAlignment="Bottom" Click="BrowseImportButton_Click" />
+                                <Button x:Name="BrowseImportButton" Grid.Column="1" Content="Browse" VerticalAlignment="Bottom" Click="BrowseImportButton_Click" />
                             </Grid>
 
                             <TextBox Header="Pack name" Text="{Binding ImportPackName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel x:Name="ImportActionButtonsPanel" Orientation="Horizontal" Spacing="8">
                                 <Button Content="Import .txt file" Click="ImportButton_Click" />
                                 <Button Content="Cancel Import" Click="CancelImportButton_Click" />
                                 <Button Content="Refresh Packs" Click="RefreshPacksButton_Click" />
@@ -284,7 +298,7 @@
                             <TextBlock Text="{Binding ImportStatus}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
                             <StackPanel Spacing="6">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                <StackPanel x:Name="DifficultyPanel" Orientation="Horizontal" Spacing="8">
                                     <TextBlock Text="Difficulty" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <ComboBox
                                         x:Name="DifficultyPresetComboBox"
@@ -296,11 +310,11 @@
                                         <ComboBoxItem Content="Symbols" />
                                     </ComboBox>
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                <StackPanel x:Name="ContentSourcePanel" Orientation="Horizontal" Spacing="16">
                                     <CheckBox Content="Use imported content" IsChecked="{Binding UseImportedContent, Mode=TwoWay}" />
                                     <CheckBox Content="Use built-in content" IsChecked="{Binding UseBuiltInContent, Mode=TwoWay}" />
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                <StackPanel x:Name="AllowedCharactersPanel" Orientation="Horizontal" Spacing="16">
                                     <CheckBox Content="Allow capitals" IsChecked="{Binding AllowCapitalLetters, Mode=TwoWay}" />
                                     <CheckBox Content="Allow numbers" IsChecked="{Binding AllowNumbers, Mode=TwoWay}" />
                                     <CheckBox Content="Allow punctuation" IsChecked="{Binding AllowPunctuation, Mode=TwoWay}" />
@@ -328,7 +342,11 @@
                                 BorderThickness="1"
                                 CornerRadius="6">
                                 <StackPanel Spacing="10">
-                                    <Grid ColumnSpacing="12">
+                                    <Grid x:Name="ImportPreviewHeaderGrid" ColumnSpacing="12" RowSpacing="8">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
@@ -365,12 +383,17 @@
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                     </Grid>
-                                    <Grid ColumnSpacing="10">
+                                    <Grid x:Name="ImportPreviewSamplesGrid" ColumnSpacing="10" RowSpacing="10">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition x:Name="ImportPreviewOriginalColumn" Width="*" />
+                                            <ColumnDefinition x:Name="ImportPreviewCleanedColumn" Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBox
+                                            x:Name="ImportOriginalPreviewTextBox"
                                             Header="Original sample"
                                             Text="{Binding ImportOriginalPreviewText, Mode=OneWay}"
                                             IsReadOnly="True"
@@ -378,6 +401,7 @@
                                             TextWrapping="Wrap"
                                             MaxHeight="132" />
                                         <TextBox
+                                            x:Name="ImportCleanedPreviewTextBox"
                                             Grid.Column="1"
                                             Header="Typing sample"
                                             Text="{Binding ImportCleanedPreviewText, Mode=OneWay}"
@@ -389,7 +413,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Grid ColumnSpacing="8" RowSpacing="8">
+                            <Grid x:Name="SelectedPackGrid" ColumnSpacing="8" RowSpacing="8">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
@@ -405,7 +429,14 @@
                                 <Button Grid.Row="1" Content="Preview Selected Pack" HorizontalAlignment="Left" Click="PreviewPackButton_Click" />
                             </Grid>
 
-                            <ListView x:Name="ContentPacksListView" ItemsSource="{Binding ContentPackRows}" SelectionMode="Single" SelectionChanged="ContentPacksListView_SelectionChanged" MaxHeight="260">
+                            <ListView
+                                x:Name="ContentPacksListView"
+                                ItemsSource="{Binding ContentPackRows}"
+                                SelectionMode="Single"
+                                SelectionChanged="ContentPacksListView_SelectionChanged"
+                                MaxHeight="260"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.HorizontalScrollMode="Enabled">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="12" Padding="0,8">
@@ -427,7 +458,7 @@
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
-                            <ListView ItemsSource="{Binding ContentPreviewRows}" SelectionMode="None" MaxHeight="180">
+                            <ListView x:Name="ContentPreviewListView" ItemsSource="{Binding ContentPreviewRows}" SelectionMode="None" MaxHeight="180">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Padding="0,6">
@@ -441,19 +472,19 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="1" Grid.Column="1" Padding="18" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+                    <Border x:Name="DataSettingsCard" Grid.Row="1" Grid.Column="1" Padding="18" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
                         <StackPanel Spacing="14">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Data" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="Export or clear local practice history." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                             <TextBox Header="Export path" Text="{Binding ExportPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel x:Name="ExportButtonsPanel" Orientation="Horizontal" Spacing="8">
                                 <Button Content="Export Sessions JSON" Click="ExportSessionsButton_Click" />
                                 <Button Content="Delete Practice History" Click="DeleteHistoryButton_Click" />
                             </StackPanel>
                             <TextBox Header="Database backup / restore path" Text="{Binding BackupPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel x:Name="BackupButtonsPanel" Orientation="Horizontal" Spacing="8">
                                 <Button Content="Backup Database" Click="BackupDatabaseButton_Click" />
                                 <Button Content="Restore Database" Click="RestoreDatabaseButton_Click" />
                             </StackPanel>
